@@ -176,6 +176,26 @@ docker run -d \
 
 ## 高级功能
 
+### 环境变量配置（可选）
+
+首次部署时，可以创建 `.env` 文件配置安全选项：
+
+```bash
+# 复制示例文件
+cp .env.example .env
+
+# 编辑配置
+FLASK_SECRET_KEY=your-secure-random-key
+BASIC_AUTH_CREDENTIALS=admin:password123
+IP_WHITELIST_ENABLED=false
+```
+
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| FLASK_SECRET_KEY | Session 密钥 | 内置默认值 |
+| BASIC_AUTH_CREDENTIALS | API 认证 (格式: user:pass) | 空（不启用）|
+| IP_WHITELIST_ENABLED | 启用 IP 白名单 | false |
+
 ### API 接口
 
 可通过 curl 命令调用：
@@ -241,5 +261,5 @@ docker restart esxi-vm-manager
 
 - **技术栈**：Python + Flask + pyvmomi (vSphere API)
 - **部署方式**：Docker
-- **版本**：2.0.0
-- **更新日期**：2026-04-07
+- **版本**：2.1.0
+- **更新日期**：2026-04-09
