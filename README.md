@@ -63,6 +63,40 @@ docker run -d \
 | 卷挂载 | /vol1/1000/docker/esxi-vm-manager/logs → /app/logs |
 | 重启策略 | unless-stopped |
 
+#### 方法三：docker-compose 部署
+
+```bash
+# 创建目录
+mkdir -p /vol1/1000/docker/esxi-vm-manager
+cd /vol1/1000/docker/esxi-vm-manager
+
+# 下载 docker-compose.yml
+curl -O https://raw.githubusercontent.com/ericyaoxr/esxi-vm-manager/main/docker-compose.yml
+
+# 启动服务
+docker-compose up -d
+```
+
+或创建 `docker-compose.yml` 文件：
+
+```yaml
+version: '3.8'
+
+services:
+  esxi-vm-manager:
+    image: ghcr.io/ericyaoxr/esxi-vm-manager:latest
+    container_name: esxi-vm-manager
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./config:/app/config:rw
+      - ./logs:/app/logs:rw
+    environment:
+      - FLASK_ENV=production
+    restart: unless-stopped
+    network_mode: host
+```
+
 ### 第三步：访问使用
 
 打开浏览器访问：`http://<服务器IP>:5000`
