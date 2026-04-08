@@ -1,5 +1,12 @@
 const API_BASE = '/api';
 
+function escapeHtml(text) {
+    if (text == null) return '';
+    const div = document.createElement('div');
+    div.textContent = String(text);
+    return div.innerHTML;
+}
+
 let vmData = [];
 let servers = [];
 let selectedVMs = new Set();
@@ -133,11 +140,11 @@ async function loadServerDetail() {
                 return `
                     <div class="server-card error">
                         <div class="server-header">
-                            <span class="server-name">${server.name || server.host}</span>
+                            <span class="server-name">${escapeHtml(server.name) || server.host}</span>
                             <span class="server-status disconnected">离线</span>
                         </div>
                         <div class="server-info">
-                            <p class="error-text">${server.error || '连接失败'}</p>
+                            <p class="error-text">${escapeHtml(server.error) || '连接失败'}</p>
                         </div>
                     </div>
                 `;
@@ -155,7 +162,7 @@ async function loadServerDetail() {
                 </tr>
             `).join('');
 
-            const remark = server.remark || '';
+            const remark = escapeHtml(server.remark || '');
             const remarkDisplay = `<div class="server-remark-row" id="remark-row-${server.host}">
                 <strong>备注:</strong>
                 <span class="server-remark-text" id="remark-text-${server.host}" onclick="startEditRemark('${server.host}')">${remark || '暂无备注'}</span>
@@ -166,12 +173,12 @@ async function loadServerDetail() {
             return `
                 <div class="server-card">
                     <div class="server-header">
-                        <span class="server-name">${server.name || server.host}</span>
+                        <span class="server-name">${escapeHtml(server.name) || server.host}</span>
                         <span class="server-status connected">在线</span>
                     </div>
                     <div class="server-info">
-                        <p><strong>型号:</strong> ${server.model || 'N/A'}</p>
-                        <p><strong>厂商:</strong> ${server.server_vendor || 'N/A'}</p>
+                        <p><strong>型号:</strong> ${escapeHtml(server.model) || 'N/A'}</p>
+                        <p><strong>厂商:</strong> ${escapeHtml(server.server_vendor) || 'N/A'}</p>
                         <p><strong>地址:</strong> ${server.host}</p>
                         <p><strong>版本:</strong> ${server.version} (Build ${server.build})</p>
                         <p><strong>虚拟机:</strong> ${server.vm_count} 台</p>
@@ -1046,7 +1053,7 @@ function renderCredentialsList() {
     const serverCards = servers.map((server, index) => `
         <div class="credential-card">
             <div class="credential-info">
-                <strong>${server.name || server.host}</strong>
+                <strong>${escapeHtml(server.name) || server.host}</strong>
                 <span>${server.host}</span>
             </div>
             <button class="btn btn-danger btn-sm" onclick="deleteServer(${index})">删除</button>
