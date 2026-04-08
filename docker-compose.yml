@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  esxi-vm-manager:
+    build: .
+    container_name: esxi-vm-manager
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./config:/app/config:rw
+      - ./logs:/app/logs:rw
+    environment:
+      - FLASK_ENV=production
+      - SECRET_KEY=your-secret-key-change-in-production
+    restart: unless-stopped
+    network_mode: host
