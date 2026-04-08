@@ -27,8 +27,8 @@
 
 ```bash
 # 创建目录
-mkdir -p /volume1/docker/esxi-vm-manager
-cd /volume1/docker/esxi-vm-manager
+mkdir -p /vol1/1000/docker/esxi-vm-manager
+cd /vol1/1000/docker/esxi-vm-manager
 
 # 登录镜像仓库（只需一次）
 docker login ghcr.io -u ericyaoxr
@@ -59,8 +59,8 @@ docker run -d \
 | 容器名称 | esxi-vm-manager |
 | 镜像 | ghcr.io/ericyaoxr/esxi-vm-manager:latest |
 | 端口映射 | 5000:5000 |
-| 卷挂载 | /volume1/docker/esxi-vm-manager/config → /app/config |
-| 卷挂载 | /volume1/docker/esxi-vm-manager/logs → /app/logs |
+| 卷挂载 | /vol1/1000/docker/esxi-vm-manager/config → /app/config |
+| 卷挂载 | /vol1/1000/docker/esxi-vm-manager/logs → /app/logs |
 | 重启策略 | unless-stopped |
 
 ### 第三步：访问使用
