@@ -1067,14 +1067,23 @@ textarea {
     }
 
     nav {
-        justify-content: center;
+        display: flex;
+        overflow-x: auto;
+        gap: 4px;
+        padding-bottom: 8px;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+
+    nav::-webkit-scrollbar {
+        display: none;
     }
 
     .nav-btn {
-        flex: 1;
-        text-align: center;
+        flex: 0 0 auto;
         padding: 10px 12px;
-        font-size: 0.9rem;
+        font-size: 0.85rem;
+        white-space: nowrap;
     }
 
     .vm-grid {
@@ -1100,5 +1109,195 @@ textarea {
 
     .delay-control input[type="range"] {
         width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    header h1 {
+        font-size: 1.2rem;
+    }
+
+    .nav {
+        display: flex;
+        overflow-x: auto;
+        gap: 4px;
+        padding-bottom: 8px;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+
+    .nav::-webkit-scrollbar {
+        display: none;
+    }
+
+    .nav-btn {
+        flex: 0 0 auto;
+        padding: 8px 10px;
+        font-size: 0.8rem;
+        white-space: nowrap;
+    }
+
+    .card {
+        padding: 16px;
+    }
+
+    .card h2 {
+        font-size: 1rem;
+    }
+
+    .batch-section h2 {
+        flex-wrap: wrap;
+    }
+
+    .execution-time-badge {
+        order: -1;
+        width: 100%;
+        text-align: center;
+    }
+
+    .delay-control {
+        width: 100%;
+    }
+
+    .delay-control input[type="range"] {
+        width: 100%;
+    }
+
+    .action-buttons {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .action-buttons .btn {
+        width: 100%;
+    }
+
+    .vm-header-actions {
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    .vm-header-actions .btn {
+        flex: 1;
+        min-width: 80px;
+    }
+
+    .vm-search-box {
+        width: 100%;
+    }
+
+    .vm-search-box input {
+        flex: 1;
+    }
+
+    .selected-vms-preview {
+        padding: 10px;
+    }
+
+    .selected-vm-item {
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    .selected-vm-name,
+    .selected-vm-server {
+        width: auto;
+        flex: 1;
+    }
+
+    .server-card {
+        min-height: 150px;
+    }
+
+    .disk-table {
+        font-size: 0.75rem;
+    }
+
+    .disk-table th,
+    .disk-table td {
+        padding: 4px;
+    }
+
+    .task-form .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .day-selector-inline {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .modal-content {
+        padding: 16px;
+        width: 95%;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    .modal-buttons {
+        flex-direction: column;
+    }
+
+    .modal-buttons .btn {
+        width: 100%;
+    }
+
+    .toast {
+        left: 20px;
+        right: 20px;
+        bottom: 20px;
+        max-width: none;
+    }
+
+    .log-controls {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .log-controls .btn {
+        flex: 1;
+        min-width: 100px;
+    }
+
+    .log-content {
+        max-height: 300px;
+        font-size: 0.75rem;
+    }
+
+    .favorites-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .credential-card {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+
+    .credential-card .btn {
+        width: 100%;
+    }
+
+    .form-group input,
+    .form-group select {
+        font-size: 16px;
+    }
+}
+
+@media (hover: none) and (pointer: coarse) {
+    .nav-btn:hover {
+        transform: none;
+    }
+
+    .card:hover {
+        transform: none;
+    }
+
+    .btn:active {
+        opacity: 0.8;
+    }
+
+    .vm-card:active {
+        border-color: var(--primary-color);
     }
 }
