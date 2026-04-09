@@ -1135,6 +1135,85 @@ textarea {
     .delay-control input[type="range"] {
         width: 100%;
     }
+
+    .dashboard-grid {
+        gap: 12px;
+    }
+
+    .card {
+        padding: 14px;
+    }
+
+    .card h2 {
+        font-size: 1rem;
+        margin-bottom: 12px;
+    }
+
+    .batch-section h2 {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .delay-control {
+        width: 100%;
+        margin-bottom: 12px;
+    }
+
+    .delay-control label {
+        font-size: 0.85rem;
+    }
+
+    .action-buttons {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .action-buttons .btn {
+        width: 100%;
+        padding: 10px 16px;
+        font-size: 0.9rem;
+    }
+
+    .vm-header-actions {
+        flex-direction: column;
+        width: 100%;
+        gap: 6px;
+    }
+
+    .vm-header-actions .btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .vm-search-box {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .vm-search-box input {
+        width: 100%;
+    }
+
+    .vm-search-box .btn {
+        width: 100%;
+    }
+
+    .selected-vms-preview {
+        padding: 10px;
+    }
+
+    .selected-vms-grid {
+        gap: 6px;
+    }
+
+    .selected-vm-item {
+        padding: 6px 10px;
+        font-size: 0.8rem;
+    }
+
+    .favorites-section .card h2 {
+        font-size: 0.95rem;
+    }
 }
 
 @media (max-width: 480px) {
