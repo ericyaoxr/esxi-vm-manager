@@ -16,7 +16,7 @@ let currentFavoriteIndex = -1;
 let isProcessing = false;
 
 function setBatchButtonsDisabled(disabled) {
-    const btns = document.querySelectorAll('.batch-panel .btn');
+    const btns = document.querySelectorAll('.batch-section .btn');
     btns.forEach(btn => {
         if (disabled) {
             btn.dataset.originalText = btn.textContent;
@@ -73,28 +73,12 @@ async function apiRequest(endpoint, options = {}) {
 }
 
 function showToast(message, type = 'info') {
-    const container = document.getElementById('toast');
-    if (!container) return;
-
-    const icons = {
-        success: '✓',
-        error: '✕',
-        warning: '⚠',
-        info: 'ℹ'
-    };
-
-    const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-    toast.innerHTML = `
-        <span class="toast-icon">${icons[type] || icons.info}</span>
-        <span class="toast-message">${escapeHtml(message)}</span>
-    `;
-
-    container.appendChild(toast);
-
+    const toast = document.getElementById('toast');
+    if (!toast) return;
+    toast.textContent = message;
+    toast.className = `toast ${type} show`;
     setTimeout(() => {
-        toast.style.animation = 'toastSlideIn 0.3s ease reverse';
-        setTimeout(() => toast.remove(), 300);
+        toast.className = 'toast';
     }, 3000);
 }
 
@@ -105,11 +89,11 @@ async function checkConnection() {
         const text = document.getElementById('connection-text');
 
         if (result.connected) {
-            indicator.className = 'status-indicator online';
+            indicator.className = 'status-dot connected';
             const serverCount = result.servers ? result.servers.length : 0;
             text.textContent = `已连接 ${serverCount} 台服务器`;
         } else {
-            indicator.className = 'status-indicator offline';
+            indicator.className = 'status-dot disconnected';
             text.textContent = '未连接';
         }
         return result.connected;
@@ -147,11 +131,7 @@ async function loadServerDetail() {
         console.log('Server detail result:', result);
 
         if (!result.success || !result.servers || result.servers.length === 0) {
-            serverListDiv.innerHTML = `
-                <div class="empty-state">
-                    <span class="icon">🖧</span>
-                    <p class="text-muted">暂无服务器信息</p>
-                </div>`;
+            serverListDiv.innerHTML = '<p class="text-muted">暂无服务器信息</p>';
             return;
         }
 
@@ -159,104 +139,78 @@ async function loadServerDetail() {
             if (!server.connected) {
                 return `
                     <div class="server-card error">
-                        <div class="server-card-header">
+                        <div class="server-header">
                             <span class="server-name">${escapeHtml(server.name) || server.host}</span>
-                            <span class="server-status offline">离线</span>
+                            <span class="server-status disconnected">离线</span>
                         </div>
-                        <p class="text-muted" style="color: var(--danger);">${escapeHtml(server.error) || '连接失败'}</p>
+                        <div class="server-info">
+                            <p class="error-text">${escapeHtml(server.error) || '连接失败'}</p>
+                        </div>
                     </div>
                 `;
             }
 
-            const cpuPercent = server.cpu.usage_percent;
-            const cpuClass = cpuPercent > 80 ? 'high' : cpuPercent > 60 ? 'medium' : 'low';
+            const cpuBar = createProgressBar(server.cpu.usage_percent, 'CPU');
+            const memBar = createProgressBar(server.memory.usage_percent, '内存');
 
-            const memPercent = server.memory.usage_percent;
-            const memClass = memPercent > 80 ? 'high' : memPercent > 60 ? 'medium' : 'low';
-
-            const diskRows = server.disks.map(disk => {
-                const diskPercent = disk.usage_percent;
-                const diskClass = diskPercent > 90 ? 'high' : diskPercent > 70 ? 'medium' : 'low';
-                return `
-                    <tr>
-                        <td>${disk.name}</td>
-                        <td>${formatSize(disk.capacity)}</td>
-                        <td>${formatSize(disk.free)}</td>
-                        <td><span class="resource-fill ${diskClass}">${disk.usage_percent.toFixed(1)}%</span></td>
-                    </tr>
-                `;
-            }).join('');
+            const diskRows = server.disks.map(disk => `
+                <tr>
+                    <td>${disk.name}</td>
+                    <td>${formatSize(disk.capacity)}</td>
+                    <td>${formatSize(disk.free)}</td>
+                    <td>${disk.usage_percent.toFixed(1)}%</td>
+                </tr>
+            `).join('');
 
             const remark = escapeHtml(server.remark || '');
+            const remarkDisplay = `<div class="server-remark-row" id="remark-row-${server.host}">
+                <strong>备注:</strong>
+                <span class="server-remark-text" id="remark-text-${server.host}" onclick="startEditRemark('${server.host}')">${remark || '暂无备注'}</span>
+                <input type="text" class="server-remark-input" id="remark-input-${server.host}" value="${remark || ''}" style="display:none;" onblur="saveRemarkBlur('${server.host}')" onkeydown="handleRemarkKeydown(event, '${server.host}')">
+                <button class="btn btn-xs btn-secondary" id="remark-btn-${server.host}" onclick="startEditRemark('${server.host}')">✏️</button>
+            </div>`;
 
             return `
                 <div class="server-card">
-                    <div class="server-card-header">
+                    <div class="server-header">
                         <span class="server-name">${escapeHtml(server.name) || server.host}</span>
-                        <span class="server-status online">在线</span>
+                        <span class="server-status connected">在线</span>
                     </div>
-                    <div class="server-info-grid">
-                        <div class="server-info-item">
-                            <label>型号</label>
-                            <span>${escapeHtml(server.model) || 'N/A'}</span>
+                    <div class="server-info">
+                        <p><strong>型号:</strong> ${escapeHtml(server.model) || 'N/A'}</p>
+                        <p><strong>厂商:</strong> ${escapeHtml(server.server_vendor) || 'N/A'}</p>
+                        <p><strong>地址:</strong> ${server.host}</p>
+                        <p><strong>版本:</strong> ${server.version} (Build ${server.build})</p>
+                        <p><strong>虚拟机:</strong> ${server.vm_count} 台</p>
+                        ${remarkDisplay}
+                    </div>
+                    <div class="server-stats">
+                        <div class="stat-item">
+                            <span class="progress-label">CPU (${server.cpu.usage_ghz || 0} / ${server.cpu.total_ghz || 0} GHz, ${server.cpu.usage_percent}%)</span>
+                            ${cpuBar}
                         </div>
-                        <div class="server-info-item">
-                            <label>厂商</label>
-                            <span>${escapeHtml(server.server_vendor) || 'N/A'}</span>
-                        </div>
-                        <div class="server-info-item">
-                            <label>地址</label>
-                            <span>${server.host}</span>
-                        </div>
-                        <div class="server-info-item">
-                            <label>版本</label>
-                            <span>${server.version} (Build ${server.build})</span>
-                        </div>
-                        <div class="server-info-item">
-                            <label>虚拟机</label>
-                            <span>${server.vm_count} 台</span>
-                        </div>
-                        <div class="server-info-item">
-                            <label>备注</label>
-                            <span>${remark || '暂无'}</span>
+                        <div class="stat-item">
+                            <span class="progress-label">内存 ${formatSize(server.memory.usage)} / ${formatSize(server.memory.total)} (${server.memory.usage_percent}%)</span>
+                            ${memBar}
                         </div>
                     </div>
-                    <div class="resource-bar">
-                        <div class="resource-label">
-                            <span class="resource-name">CPU</span>
-                            <span class="resource-value">${server.cpu.usage_ghz || 0} / ${server.cpu.total_ghz || 0} GHz (${cpuPercent}%)</span>
-                        </div>
-                        <div class="resource-track">
-                            <div class="resource-fill ${cpuClass}" style="width: ${cpuPercent}%"></div>
-                        </div>
+                    <div class="server-disks">
+                        <p class="disk-title"><strong>存储</strong></p>
+                        <table class="disk-table">
+                            <tr><th>名称</th><th>总容量</th><th>剩余</th><th>使用率</th></tr>
+                            ${diskRows}
+                        </table>
                     </div>
-                    <div class="resource-bar">
-                        <div class="resource-label">
-                            <span class="resource-name">内存</span>
-                            <span class="resource-value">${formatSize(server.memory.usage)} / ${formatSize(server.memory.total)} (${memPercent}%)</span>
-                        </div>
-                        <div class="resource-track">
-                            <div class="resource-fill ${memClass}" style="width: ${memPercent}%"></div>
-                        </div>
-                    </div>
-                    <table class="disk-table">
-                        <tr><th>名称</th><th>总容量</th><th>剩余</th><th>使用率</th></tr>
-                        ${diskRows}
-                    </table>
                 </div>
             `;
         }).join('');
 
-        serverListDiv.innerHTML = serverCards;
+        serverListDiv.innerHTML = `<div class="server-grid">${serverCards}</div>`;
     } catch (e) {
         console.error('加载服务器详情失败:', e);
         const serverListDiv = document.getElementById('server-list');
         if (serverListDiv) {
-            serverListDiv.innerHTML = `
-                <div class="empty-state">
-                    <span class="icon">⚠</span>
-                    <p class="text-muted">加载失败</p>
-                </div>`;
+            serverListDiv.innerHTML = '<p class="text-muted">加载失败</p>';
         }
     }
 }
@@ -266,6 +220,83 @@ function formatSize(gb) {
         return (gb / 1024).toFixed(2) + ' TB';
     }
     return gb.toFixed(1) + ' GB';
+}
+
+function startEditRemark(host) {
+    const textEl = document.getElementById(`remark-text-${host}`);
+    const inputEl = document.getElementById(`remark-input-${host}`);
+    const btnEl = document.getElementById(`remark-btn-${host}`);
+
+    if (!textEl || !inputEl) return;
+
+    textEl.style.display = 'none';
+    btnEl.style.display = 'none';
+    inputEl.style.display = 'inline-block';
+    inputEl.focus();
+    inputEl.select();
+}
+
+function handleRemarkKeydown(event, host) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        saveRemarkBlur(host);
+    } else if (event.key === 'Escape') {
+        cancelEditRemark(host);
+    }
+}
+
+function cancelEditRemark(host) {
+    const textEl = document.getElementById(`remark-text-${host}`);
+    const inputEl = document.getElementById(`remark-input-${host}`);
+    const btnEl = document.getElementById(`remark-btn-${host}`);
+    const originalText = textEl ? textEl.textContent : '';
+
+    if (!textEl || !inputEl) return;
+
+    if (inputEl.value !== originalText && originalText !== '暂无备注') {
+        inputEl.value = originalText;
+    } else if (originalText === '暂无备注') {
+        inputEl.value = '';
+    }
+
+    textEl.style.display = '';
+    btnEl.style.display = '';
+    inputEl.style.display = 'none';
+}
+
+async function saveRemarkBlur(host) {
+    const textEl = document.getElementById(`remark-text-${host}`);
+    const inputEl = document.getElementById(`remark-input-${host}`);
+    const btnEl = document.getElementById(`remark-btn-${host}`);
+    const newRemark = inputEl.value.trim();
+
+    textEl.style.display = '';
+    btnEl.style.display = '';
+    inputEl.style.display = 'none';
+
+    if (newRemark === textEl.textContent) return;
+
+    const result = await apiRequest(`/servers/${host}/remark`, {
+        method: 'POST',
+        body: JSON.stringify({ remark: newRemark })
+    });
+
+    if (result.success) {
+        textEl.textContent = newRemark || '暂无备注';
+        showToast('备注已保存', 'success');
+    } else {
+        textEl.textContent = textEl.textContent || '暂无备注';
+        showToast('保存失败', 'error');
+    }
+}
+
+function createProgressBar(percent, label) {
+    const color = percent > 80 ? 'danger' : percent > 60 ? 'warning' : 'success';
+    return `
+        <div class="progress-bar">
+            <div class="progress-fill ${color}" style="width: ${percent}%"></div>
+        </div>
+    `;
 }
 
 async function loadVMs() {
@@ -278,21 +309,13 @@ async function loadVMs() {
             vmData = result.vms;
 
             if (vmData.length === 0) {
-                if (vmListDiv) vmListDiv.innerHTML = `
-                    <div class="empty-state">
-                        <span class="icon">🖥️</span>
-                        <p class="text-muted">未找到虚拟机</p>
-                    </div>`;
-                if (vmOverviewDiv) vmOverviewDiv.innerHTML = `
-                    <div class="empty-state">
-                        <span class="icon">🖥️</span>
-                        <p class="text-muted">未找到虚拟机</p>
-                    </div>`;
+                if (vmListDiv) vmListDiv.innerHTML = '<p class="text-muted">未找到虚拟机</p>';
+                if (vmOverviewDiv) vmOverviewDiv.innerHTML = '<p class="text-muted">未找到虚拟机</p>';
                 return;
             }
 
             const vmCards = vmData.map(vm => createVMCard(vm)).join('');
-            if (vmOverviewDiv) vmOverviewDiv.innerHTML = vmCards;
+            if (vmOverviewDiv) vmOverviewDiv.innerHTML = `<div class="vm-grid">${vmCards}</div>`;
 
             const serversGrouped = {};
             vmData.forEach(vm => {
@@ -311,10 +334,7 @@ async function loadVMs() {
                 const serverVmCards = group.vms.map(vm => createVMCard(vm)).join('');
                 groupedHtml += `
                     <div class="server-group">
-                        <div class="server-group-header">
-                            <span class="server-group-title">🖧 ${escapeHtml(group.server)}</span>
-                            <span class="server-group-count">${group.vms.length} 台</span>
-                        </div>
+                        <h3 class="server-group-title">🖧 ${group.server}</h3>
                         <div class="vm-grid">${serverVmCards}</div>
                     </div>
                 `;
@@ -322,36 +342,20 @@ async function loadVMs() {
             if (vmListDiv) vmListDiv.innerHTML = groupedHtml;
         } else {
             const msg = result.error || '加载虚拟机失败';
-            if (vmListDiv) vmListDiv.innerHTML = `
-                <div class="empty-state">
-                    <span class="icon">⚠</span>
-                    <p class="text-muted">${msg}</p>
-                </div>`;
-            if (vmOverviewDiv) vmOverviewDiv.innerHTML = `
-                <div class="empty-state">
-                    <span class="icon">⚠</span>
-                    <p class="text-muted">加载虚拟机失败</p>
-                </div>`;
+            if (vmListDiv) vmListDiv.innerHTML = `<p class="text-muted">${msg}</p>`;
+            if (vmOverviewDiv) vmOverviewDiv.innerHTML = '<p class="text-muted">加载虚拟机失败</p>';
         }
     } catch (e) {
         console.error('加载虚拟机失败:', e);
         const vmListDiv = document.getElementById('vm-list');
         const vmOverviewDiv = document.getElementById('vm-overview');
-        if (vmListDiv) vmListDiv.innerHTML = `
-            <div class="empty-state">
-                <span class="icon">⚠</span>
-                <p class="text-muted">加载失败</p>
-            </div>`;
-        if (vmOverviewDiv) vmOverviewDiv.innerHTML = `
-            <div class="empty-state">
-                <span class="icon">⚠</span>
-                <p class="text-muted">加载失败</p>
-            </div>`;
+        if (vmListDiv) vmListDiv.innerHTML = '<p class="text-muted">加载失败</p>';
+        if (vmOverviewDiv) vmOverviewDiv.innerHTML = '<p class="text-muted">加载失败</p>';
     }
 }
 
 function createVMCard(vm) {
-    const stateClass = vm.state === 'poweredOn' ? 'running' : vm.state === 'poweredOff' ? 'stopped' : 'suspended';
+    const stateClass = vm.state ? vm.state.toLowerCase().replace(' ', '-') : 'unknown';
     const isPoweredOff = vm.state === 'poweredOff';
     const canSuspend = vm.state === 'poweredOn';
     const canStart = vm.state === 'poweredOff' || vm.state === 'suspended';
@@ -364,36 +368,21 @@ function createVMCard(vm) {
     }[vm.state] || '未知';
 
     return `
-        <div class="vm-card ${isSelected ? 'selected' : ''}" data-vm-name="${vm.name}" data-server-host="${vm.server_host}">
+        <div class="vm-card ${isSelected ? 'selected' : ''} ${isPoweredOff ? 'vm-powered-off' : ''}" data-vm-name="${vm.name}" data-server-host="${vm.server_host}">
             <div class="vm-card-header" onclick="handleVMCardClick(event, '${vm.name}', '${vm.server_host}')">
                 <input type="checkbox" class="vm-checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); toggleVMSelection('${vm.name}', '${vm.server_host}')">
-                <span class="vm-name" title="${vm.server || ''}">${escapeHtml(vm.name)}</span>
-                <span class="state-badge ${stateClass}">${stateText}</span>
+                <span class="vm-name" title="${vm.server || ''}">${vm.name}</span>
+                <span class="vm-state ${stateClass}">${stateText}</span>
             </div>
             <div class="vm-card-body">
-                <div class="vm-info">
-                    <div class="vm-info-item">
-                        <span class="vm-info-label">服务器</span>
-                        <span class="vm-info-value">${vm.server || vm.server_host}</span>
-                    </div>
-                    <div class="vm-info-item">
-                        <span class="vm-info-label">状态</span>
-                        <span class="vm-info-value">${stateText}</span>
-                    </div>
-                    <div class="vm-info-item">
-                        <span class="vm-info-label">CPU</span>
-                        <span class="vm-info-value">${vm.cpu || 0} 核</span>
-                    </div>
-                    <div class="vm-info-item">
-                        <span class="vm-info-label">内存</span>
-                        <span class="vm-info-value">${vm.memory || 0} GB</span>
-                    </div>
-                </div>
+                <p>服务器: ${vm.server || vm.server_host}</p>
+                <p>状态: ${stateText}</p>
+                <p>CPU: ${vm.cpu || 0} 核 | 内存: ${vm.memory || 0} GB</p>
             </div>
             <div class="vm-card-footer btn-group" data-vm-name="${vm.name}" data-server-host="${vm.server_host}">
-                ${canSuspend ? `<button class="btn btn-warning btn-sm" onclick="suspendVM('${vm.name}', '${vm.server_host}', event)">⏸ 挂起</button>` : ''}
-                ${canStart ? `<button class="btn btn-success btn-sm" onclick="startVM('${vm.name}', '${vm.server_host}', event)">▶ 启动</button>` : ''}
-                <button class="btn btn-secondary btn-sm" onclick="refreshStatus()">🔄 刷新</button>
+                ${canSuspend ? `<button class="btn btn-warning btn-sm" onclick="suspendVM('${vm.name}', '${vm.server_host}', event)">挂起</button>` : ''}
+                ${canStart ? `<button class="btn btn-success btn-sm" onclick="startVM('${vm.name}', '${vm.server_host}', event)">启动</button>` : ''}
+                <button class="btn btn-secondary btn-sm" onclick="refreshStatus()">刷新</button>
             </div>
         </div>
     `;
@@ -480,21 +469,25 @@ function updateSelectedVMPreview() {
     }
 
     previewSection.style.display = 'block';
+    previewSection.classList.remove('collapsed');
     if (countBadge) countBadge.textContent = selectedVMs.size;
 
     const selectedList = getSelectedVMList();
     const vmItems = selectedList.map(vm => {
         return `
-            <div class="favorite-item">
-                <div class="favorite-info">
-                    <span class="favorite-name">${escapeHtml(vm.name)}</span>
-                    <span class="favorite-meta">${vm.server || vm.server_host}</span>
-                </div>
+            <div class="selected-vm-item">
+                <span class="selected-vm-name">${vm.name}</span>
+                <span class="selected-vm-server">${vm.server || vm.server_host}</span>
             </div>
         `;
     }).join('');
 
-    previewList.innerHTML = vmItems;
+    previewList.innerHTML = `<div class="selected-vms-grid">${vmItems}</div>`;
+
+    const h2 = previewSection.querySelector('h2');
+    if (h2 && !h2.onclick) {
+        h2.onclick = () => previewSection.classList.toggle('collapsed');
+    }
 }
 
 async function suspendSelectedVMs(event) {
@@ -615,16 +608,59 @@ let currentTotalVMs = 0;
 let currentProcessedVMs = 0;
 
 function startExecutionTimer(startTime, target = 'batch') {
-    const batchBadge = document.getElementById('execution-badge');
-    const batchTime = document.getElementById('execution-time');
+    if (target === 'single') {
+        return;
+    }
 
-    if (batchBadge) batchBadge.style.display = 'inline-flex';
+    const batchH2 = document.querySelector('.batch-section h2');
+    const vmsH2 = document.getElementById('vms-tab-title');
+
+    const createBadge = (h2) => {
+        if (!h2) return;
+        let badge = h2.querySelector('.execution-time-badge');
+        if (!badge) {
+            badge = document.createElement('span');
+            badge.className = 'execution-time-badge';
+            badge.textContent = '⏱ 0秒';
+            h2.appendChild(badge);
+        }
+    };
+
+    createBadge(batchH2);
+    createBadge(vmsH2);
 
     if (executionTimer) clearInterval(executionTimer);
     executionTimer = setInterval(() => {
         const elapsed = Math.round((Date.now() - startTime) / 1000);
         const timeStr = elapsed < 60 ? `${elapsed}秒` : `${Math.floor(elapsed / 60)}分${elapsed % 60}秒`;
-        if (batchTime) batchTime.textContent = timeStr;
+        document.querySelectorAll('.execution-time-badge').forEach(badge => {
+            badge.textContent = `⏱ ${timeStr}`;
+        });
+    }, 1000);
+}
+
+function startSingleVMExecutionTimer(vmName, serverHost, startTime) {
+    const vmCard = document.querySelector(`.vm-card[data-vm-name="${vmName}"][data-server-host="${serverHost}"]`);
+    if (!vmCard) return;
+
+    const header = vmCard.querySelector('.vm-card-header');
+    if (!header) return;
+
+    let badge = header.querySelector('.execution-time-badge');
+    if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'execution-time-badge';
+        badge.textContent = '⏱ 0秒';
+        header.appendChild(badge);
+    }
+
+    const timerKey = `singleTimer_${vmName}_${serverHost}`;
+    if (window[timerKey]) clearInterval(window[timerKey]);
+
+    window[timerKey] = setInterval(() => {
+        const elapsed = Math.round((Date.now() - startTime) / 1000);
+        const timeStr = elapsed < 60 ? `${elapsed}秒` : `${Math.floor(elapsed / 60)}分${elapsed % 60}秒`;
+        if (badge) badge.textContent = `⏱ ${timeStr}`;
     }, 1000);
 }
 
@@ -634,11 +670,30 @@ function stopExecutionTimer(target = 'batch') {
         executionTimer = null;
     }
 
-    const batchBadge = document.getElementById('execution-badge');
-    if (batchBadge) {
-        setTimeout(() => {
-            batchBadge.style.display = 'none';
-        }, 2000);
+    if (target === 'single') {
+        document.querySelectorAll('.vm-card .execution-time-badge').forEach(badge => {
+            setTimeout(() => badge.remove(), 2000);
+        });
+    } else {
+        document.querySelectorAll('.execution-time-badge').forEach(badge => {
+            setTimeout(() => badge.remove(), 2000);
+        });
+    }
+}
+
+function stopSingleVMExecutionTimer(vmName, serverHost) {
+    const timerKey = `singleTimer_${vmName}_${serverHost}`;
+    if (window[timerKey]) {
+        clearInterval(window[timerKey]);
+        window[timerKey] = null;
+    }
+
+    const vmCard = document.querySelector(`.vm-card[data-vm-name="${vmName}"][data-server-host="${serverHost}"]`);
+    if (vmCard) {
+        const badge = vmCard.querySelector('.execution-time-badge');
+        if (badge) {
+            setTimeout(() => badge.remove(), 2000);
+        }
     }
 }
 
@@ -655,7 +710,7 @@ function showBatchProgress(totalVMs) {
     if (progressDiv) progressDiv.style.display = 'block';
     if (progressFill) progressFill.style.width = '0%';
     if (countdownSpan) countdownSpan.textContent = currentCountdown;
-    if (progressText) progressText.textContent = `正在处理...`;
+    if (progressText) progressText.textContent = `正在处理... 剩余 ${currentCountdown} 秒`;
 }
 
 function updateBatchProgress(processed) {
@@ -670,7 +725,7 @@ function updateBatchProgress(processed) {
     }
 
     if (countdownSpan) countdownSpan.textContent = currentCountdown;
-    if (progressText) progressText.textContent = `正在处理 (${currentProcessedVMs}/${currentTotalVMs})...`;
+    if (progressText) progressText.textContent = `正在处理 (${currentProcessedVMs}/${currentTotalVMs})... 剩余 ${currentCountdown} 秒`;
 }
 
 function hideBatchProgress() {
@@ -694,7 +749,7 @@ function showVmsProgress(totalVMs) {
     if (progressDiv) progressDiv.style.display = 'block';
     if (progressFill) progressFill.style.width = '0%';
     if (countdownSpan) countdownSpan.textContent = currentCountdown;
-    if (progressText) progressText.textContent = `正在处理...`;
+    if (progressText) progressText.textContent = `正在处理... 剩余 ${currentCountdown} 秒`;
 }
 
 function updateVmsProgress(processed) {
@@ -709,7 +764,7 @@ function updateVmsProgress(processed) {
     }
 
     if (countdownSpan) countdownSpan.textContent = currentCountdown;
-    if (progressText) progressText.textContent = `正在处理 (${currentProcessedVMs}/${currentTotalVMs})...`;
+    if (progressText) progressText.textContent = `正在处理 (${currentProcessedVMs}/${currentTotalVMs})... 剩余 ${currentCountdown} 秒`;
 }
 
 function hideVmsProgress() {
@@ -749,6 +804,7 @@ async function suspendVM(vmName, serverHost, event) {
     const startTime = Date.now();
     setVmsButtonsDisabled(true);
     setVMButtonsDisabled(vmName, serverHost, true);
+    startSingleVMExecutionTimer(vmName, serverHost, startTime);
 
     const result = await apiRequest('/vm/suspend', {
         method: 'POST',
@@ -758,6 +814,7 @@ async function suspendVM(vmName, serverHost, event) {
     isProcessing = false;
     setVmsButtonsDisabled(false);
     setVMButtonsDisabled(vmName, serverHost, false);
+    stopSingleVMExecutionTimer(vmName, serverHost);
 
     if (result.success) {
         showToast(`虚拟机 ${vmName} 挂起成功`, 'success');
@@ -773,6 +830,7 @@ async function startVM(vmName, serverHost, event) {
     const startTime = Date.now();
     setVmsButtonsDisabled(true);
     setVMButtonsDisabled(vmName, serverHost, true);
+    startSingleVMExecutionTimer(vmName, serverHost, startTime);
 
     const result = await apiRequest('/vm/start', {
         method: 'POST',
@@ -782,6 +840,7 @@ async function startVM(vmName, serverHost, event) {
     isProcessing = false;
     setVmsButtonsDisabled(false);
     setVMButtonsDisabled(vmName, serverHost, false);
+    stopSingleVMExecutionTimer(vmName, serverHost);
 
     if (result.success) {
         showToast(`虚拟机 ${vmName} 启动成功`, 'success');
@@ -815,11 +874,7 @@ function renderFavorites() {
 
     if (favorites.length === 0) {
         currentFavoriteIndex = -1;
-        quickDiv.innerHTML = `
-            <div class="empty-state">
-                <span class="icon">📌</span>
-                <p class="text-muted">暂无收藏</p>
-            </div>`;
+        quickDiv.innerHTML = '<p class="text-muted">暂无收藏</p>';
         return;
     }
 
@@ -828,14 +883,14 @@ function renderFavorites() {
         return `
         <div class="favorite-item ${isActive ? 'active' : ''}" data-index="${index}" onclick="loadFavoriteToSelection(${index})">
             <div class="favorite-info">
-                <span class="favorite-name">${escapeHtml(fav.name)}</span>
-                <span class="favorite-meta">${fav.vms.length}台</span>
+                <span class="favorite-name">${fav.name}</span>
+                <span class="favorite-count">${fav.vms.length}台</span>
             </div>
-            <button class="btn btn-danger btn-sm favorite-delete" onclick="event.stopPropagation(); deleteFavorite(${index})">🗑️</button>
+            <button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); deleteFavorite(${index})">删除</button>
         </div>
     `}).join('');
 
-    quickDiv.innerHTML = favCards;
+    quickDiv.innerHTML = `<div class="favorites-grid">${favCards}</div>`;
 }
 
 function loadFavoriteToSelection(index) {
@@ -847,7 +902,7 @@ function loadFavoriteToSelection(index) {
         const dashboardTab = document.querySelector('.nav-btn[data-tab="dashboard"]');
         if (dashboardTab) {
             document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.tab-panel').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
             dashboardTab.classList.add('active');
             document.getElementById('dashboard').classList.add('active');
         }
@@ -885,7 +940,7 @@ function loadFavoriteToSelection(index) {
     const dashboardTab = document.querySelector('.nav-btn[data-tab="dashboard"]');
     if (dashboardTab) {
         document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.tab-panel').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
         dashboardTab.classList.add('active');
         document.getElementById('dashboard').classList.add('active');
     }
@@ -927,15 +982,15 @@ function openSaveFavoriteModal() {
     nameInput.value = '';
     const selectedList = getSelectedVMList();
     countSpan.textContent = selectedList.length;
-    namesDiv.innerHTML = selectedList.map(v => `<span class="task-vm-chip">${escapeHtml(v.name)}</span>`).join('');
+    namesDiv.textContent = selectedList.map(v => v.name).join(', ');
 
-    modal.classList.add('show');
+    modal.style.display = 'flex';
     nameInput.focus();
 }
 
 function closeSaveFavoriteModal() {
     const modal = document.getElementById('save-favorite-modal');
-    if (modal) modal.classList.remove('show');
+    if (modal) modal.style.display = 'none';
 }
 
 async function confirmSaveFavorite() {
@@ -991,25 +1046,21 @@ function renderCredentialsList() {
     if (!listDiv) return;
 
     if (servers.length === 0) {
-        listDiv.innerHTML = `
-            <div class="empty-state">
-                <span class="icon">🖥️</span>
-                <p class="text-muted">暂无配置</p>
-            </div>`;
+        listDiv.innerHTML = '<p class="text-muted">暂无配置</p>';
         return;
     }
 
     const serverCards = servers.map((server, index) => `
         <div class="credential-card">
             <div class="credential-info">
-                <span class="credential-name">${escapeHtml(server.name) || server.host}</span>
-                <span class="credential-host">${server.host}</span>
+                <strong>${escapeHtml(server.name) || server.host}</strong>
+                <span>${server.host}</span>
             </div>
-            <button class="btn btn-danger btn-sm" onclick="deleteServer(${index})">🗑️ 删除</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteServer(${index})">删除</button>
         </div>
     `).join('');
 
-    listDiv.innerHTML = serverCards;
+    listDiv.innerHTML = `<div class="credentials-grid">${serverCards}</div>`;
 }
 
 function openAddCredentialModal() {
@@ -1021,12 +1072,12 @@ function openAddCredentialModal() {
     document.getElementById('server-username').value = '';
     document.getElementById('server-password').value = '';
 
-    modal.classList.add('show');
+    modal.style.display = 'flex';
 }
 
 function closeAddCredentialModal() {
     const modal = document.getElementById('add-credential-modal');
-    if (modal) modal.classList.remove('show');
+    if (modal) modal.style.display = 'none';
 }
 
 async function confirmAddCredential() {
@@ -1135,10 +1186,10 @@ function stopLogAutoRefresh() {
 function toggleLogAutoRefresh(btn) {
     if (logAutoRefresh) {
         stopLogAutoRefresh();
-        if (btn) btn.innerHTML = '<span>▶</span> 自动刷新';
+        if (btn) btn.textContent = '▶ 自动刷新';
     } else {
         startLogAutoRefresh();
-        if (btn) btn.innerHTML = '<span>⏸</span> 停止刷新';
+        if (btn) btn.textContent = '⏸ 停止刷新';
     }
 }
 
@@ -1152,7 +1203,7 @@ function initSchedulerForm() {
         return;
     }
     vmSelector.innerHTML = vmData.map(vm => `
-        <span class="task-vm-chip" data-vm="${vm.name}|${vm.server_host}" onclick="toggleTaskVM(this)">${escapeHtml(vm.name)}</span>
+        <span class="task-vm-item" data-vm="${vm.name}|${vm.server_host}" onclick="toggleTaskVM(this)">${vm.name}</span>
     `).join('');
 }
 
@@ -1166,17 +1217,6 @@ function toggleTaskVM(el) {
         el.classList.add('selected');
     }
 }
-
-document.querySelectorAll('.day-chip input[type="checkbox"]').forEach(checkbox => {
-    checkbox.addEventListener('change', function() {
-        const label = this.parentElement;
-        if (this.checked) {
-            label.classList.add('selected');
-        } else {
-            label.classList.remove('selected');
-        }
-    });
-});
 
 async function createTask() {
     const name = document.getElementById('new-task-name').value.trim();
@@ -1230,13 +1270,9 @@ function resetTaskForm() {
     document.getElementById('new-task-wechat-url').value = '';
     document.getElementById('new-task-wechat-config').style.display = 'none';
     document.querySelectorAll('input[name="new-task-days"]').forEach((cb, i) => cb.checked = i < 5);
-    document.querySelectorAll('.day-chip').forEach((label, i) => {
-        if (i < 5) label.classList.add('selected');
-        else label.classList.remove('selected');
-    });
     selectedTaskVMs.clear();
-    document.querySelectorAll('.task-vm-chip').forEach(el => el.classList.remove('selected'));
-    document.getElementById('new-task-submit-btn').innerHTML = '<span>✓</span> 创建任务';
+    document.querySelectorAll('.task-vm-item').forEach(el => el.classList.remove('selected'));
+    document.getElementById('new-task-submit-btn').textContent = '创建任务';
     document.getElementById('new-task-submit-btn').onclick = createTask;
     const cancelBtn = document.getElementById('new-task-cancel-btn');
     if (cancelBtn) cancelBtn.style.display = 'none';
@@ -1281,35 +1317,27 @@ async function openEditTaskModal(taskId) {
         document.querySelectorAll('input[name="new-task-days"]').forEach(cb => {
             cb.checked = days.includes(cb.value);
         });
-        document.querySelectorAll('.day-chip').forEach(label => {
-            const input = label.querySelector('input');
-            if (input) {
-                if (days.includes(input.value)) {
-                    label.classList.add('selected');
-                } else {
-                    label.classList.remove('selected');
-                }
-            }
-        });
 
         selectedTaskVMs.clear();
-        document.querySelectorAll('.task-vm-chip').forEach(el => el.classList.remove('selected'));
+        document.querySelectorAll('.task-vm-item').forEach(el => el.classList.remove('selected'));
         if (task.target_vms && Array.isArray(task.target_vms)) {
             task.target_vms.forEach(vm => {
                 const key = `${vm.name}|${vm.server_host}`;
                 selectedTaskVMs.add(key);
-                const el = document.querySelector(`.task-vm-chip[data-vm="${vm.name}|${vm.server_host}"]`);
+                const el = document.querySelector(`.task-vm-item[data-vm="${vm.name}"][data-server="${vm.server_host}"]`);
                 if (el) el.classList.add('selected');
             });
         }
 
-        document.getElementById('new-task-submit-btn').innerHTML = '<span>✓</span> 保存修改';
+        document.getElementById('new-task-submit-btn').textContent = '保存修改';
         document.getElementById('new-task-submit-btn').onclick = updateTask;
         const cancelBtn = document.getElementById('new-task-cancel-btn');
         if (cancelBtn) {
-            cancelBtn.style.display = 'inline-flex';
+            cancelBtn.style.display = 'inline-block';
             cancelBtn.onclick = cancelEditTask;
         }
+
+        document.getElementById('new-task-modal')?.scrollIntoView({ behavior: 'smooth' });
     } catch (e) {
         console.error('Edit task error:', e);
         showToast('加载任务信息失败: ' + e.message, 'error');
@@ -1385,36 +1413,24 @@ async function loadTasks() {
                 const vmNames = task.target_vms?.map(v => v.name).join(', ') || '无';
 
                 return `
-                    <div class="task-item ${task.enabled ? '' : 'disabled'}">
+                    <div class="task-list-item ${task.enabled ? '' : 'disabled'}">
                         <div class="task-info">
-                            <div class="task-name">
-                                <span>${actionIcons[task.action] || '▶'}</span>
-                                <span>${escapeHtml(task.name)}</span>
-                                ${task.notify_enabled ? '<span>🔔</span>' : ''}
-                            </div>
-                            <div class="task-meta">
-                                <span>⏰ ${time}</span>
-                                <span>${dayStr}</span>
-                                <span>${vmNames}</span>
-                            </div>
+                            <div class="task-title">${actionIcons[task.action]} ${task.name}</div>
+                            <div class="task-meta">⏰ ${time} | ${dayStr} | ${vmNames} ${task.notify_enabled ? '| 🔔' : ''}</div>
                         </div>
                         <div class="task-controls">
-                            <button class="btn btn-secondary btn-sm" onclick="openEditTaskModal('${task.id}')">✏️</button>
+                            <button class="btn btn-sm btn-warning" onclick="openEditTaskModal('${task.id}')">✏️</button>
                             ${task.enabled
-                                ? `<button class="btn btn-secondary btn-sm" onclick="toggleTask('${task.id}', false)">⏸</button>`
-                                : `<button class="btn btn-success btn-sm" onclick="toggleTask('${task.id}', true)">▶</button>`
+                                ? `<button class="btn btn-sm btn-secondary" onclick="toggleTask('${task.id}', false)">⏸</button>`
+                                : `<button class="btn btn-sm btn-success" onclick="toggleTask('${task.id}', true)">▶</button>`
                             }
-                            <button class="btn btn-primary btn-sm" onclick="runTaskNow('${task.id}')">▶▶</button>
-                            <button class="btn btn-danger btn-sm" onclick="removeTask('${task.id}')">🗑️</button>
+                            <button class="btn btn-sm btn-primary" onclick="runTaskNow('${task.id}')">▶▶</button>
+                            <button class="btn btn-sm btn-danger" onclick="removeTask('${task.id}')">🗑️</button>
                         </div>
                     </div>`;
             }).join('');
         } else {
-            tasksList.innerHTML = `
-                <div class="empty-state">
-                    <span class="icon">⏰</span>
-                    <p class="text-muted">暂无定时任务</p>
-                </div>`;
+            tasksList.innerHTML = '<p class="text-muted">暂无定时任务</p>';
         }
     } catch (e) {
         console.error('加载任务失败:', e);
@@ -1441,7 +1457,7 @@ async function runTaskNow(taskId) {
         const result = await apiRequest(`/scheduler/tasks/${taskId}/run`, { method: 'POST' });
         if (result.success) {
             const r = result.result;
-            showToast(`完成: 成功${r.success} 失败${r.failed}`, r.failed > 0 ? 'warning' : 'success');
+            showToast(`完成: 成${r.success} 败${r.failed}`, r.failed > 0 ? 'warning' : 'success');
         } else {
             showToast('执行失败', 'error');
         }
@@ -1469,7 +1485,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.querySelectorAll('.nav-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.tab-panel').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
 
             this.classList.add('active');
             const tabId = this.getAttribute('data-tab');
