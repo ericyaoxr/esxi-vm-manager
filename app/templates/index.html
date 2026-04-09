@@ -8,248 +8,409 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <div class="logo">
-                <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect x="2" y="4" width="32" height="24" rx="3" stroke="white" stroke-width="2" fill="none"/>
-                    <rect x="6" y="8" width="8" height="6" rx="1" fill="white" opacity="0.8"/>
-                    <rect x="16" y="8" width="8" height="6" rx="1" fill="white" opacity="0.6"/>
-                    <rect x="6" y="16" width="18" height="2" rx="1" fill="white" opacity="0.4"/>
-                    <circle cx="28" cy="26" r="3" fill="#10b981"/>
-                    <circle cx="28" cy="26" r="1.5" fill="white"/>
-                </svg>
-            </div>
-            <h1>ESXi 虚拟机管理器</h1>
-            <div class="connection-status">
-                <span id="connection-indicator" class="status-dot"></span>
-                <span id="connection-text">检测中...</span>
+    <div class="app-container">
+        <header class="header">
+            <div class="header-content">
+                <div class="header-left">
+                    <div class="logo">
+                        <svg width="28" height="28" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect x="2" y="4" width="32" height="24" rx="3" stroke="white" stroke-width="2" fill="none"/>
+                            <rect x="6" y="8" width="8" height="6" rx="1" fill="white" opacity="0.8"/>
+                            <rect x="16" y="8" width="8" height="6" rx="1" fill="white" opacity="0.6"/>
+                            <rect x="6" y="16" width="18" height="2" rx="1" fill="white" opacity="0.4"/>
+                            <circle cx="28" cy="26" r="3" fill="#10b981"/>
+                            <circle cx="28" cy="26" r="1.5" fill="white"/>
+                        </svg>
+                    </div>
+                    <h1 class="app-title">ESXi 虚拟机管理器</h1>
+                </div>
+                <div class="header-right">
+                    <div class="connection-badge">
+                        <span id="connection-indicator" class="status-indicator"></span>
+                        <span id="connection-text">检测中...</span>
+                    </div>
+                </div>
             </div>
         </header>
 
-        <nav>
-            <button class="nav-btn active" data-tab="dashboard">控制台</button>
-            <button class="nav-btn" data-tab="servers">服务器</button>
-            <button class="nav-btn" data-tab="vms">虚拟机</button>
-            <button class="nav-btn" data-tab="scheduler">⏰ 定时任务</button>
-            <button class="nav-btn" data-tab="credentials">连接配置</button>
-            <button class="nav-btn" data-tab="logs">日志</button>
+        <nav class="main-nav">
+            <div class="nav-content">
+                <button class="nav-btn active" data-tab="dashboard">
+                    <span class="icon">📊</span>
+                    <span>控制台</span>
+                </button>
+                <button class="nav-btn" data-tab="servers">
+                    <span class="icon">🖧</span>
+                    <span>服务器</span>
+                </button>
+                <button class="nav-btn" data-tab="vms">
+                    <span class="icon">🖥️</span>
+                    <span>虚拟机</span>
+                </button>
+                <button class="nav-btn" data-tab="scheduler">
+                    <span class="icon">⏰</span>
+                    <span>定时任务</span>
+                </button>
+                <button class="nav-btn" data-tab="credentials">
+                    <span class="icon">🔐</span>
+                    <span>连接配置</span>
+                </button>
+                <button class="nav-btn" data-tab="logs">
+                    <span class="icon">📋</span>
+                    <span>日志</span>
+                </button>
+            </div>
         </nav>
 
-        <main>
-            <section id="dashboard" class="tab-content active">
+        <main class="main-content">
+            <section id="dashboard" class="tab-panel active">
                 <div class="dashboard-grid">
-                    <div class="card favorites-section">
-                        <h2>⭐ 快捷收藏</h2>
-                        <div id="favorites-quick">
-                            <p class="text-muted">暂无收藏</p>
+                    <aside class="sidebar">
+                        <div class="card">
+                            <div class="card-header">
+                                <h2 class="card-title">
+                                    <span class="icon">⭐</span>
+                                    快捷收藏
+                                </h2>
+                            </div>
+                            <div id="favorites-quick" class="favorite-list">
+                                <div class="empty-state">
+                                    <span class="icon">📌</span>
+                                    <p class="text-muted">暂无收藏</p>
+                                </div>
+                            </div>
+                            <div class="selected-vms-preview" id="selected-vms-preview" style="display:none; margin-top: 20px;">
+                                <div class="card-header">
+                                    <h3 class="card-title">
+                                        <span>📋</span>
+                                        当前选择 <span id="selected-count-badge" class="state-badge running" style="font-size: 0.75rem;">0</span>台
+                                    </h3>
+                                </div>
+                                <div id="selected-vms-list" class="favorite-list"></div>
+                            </div>
                         </div>
-                        <div class="selected-vms-preview" id="selected-vms-preview" style="display:none;">
-                            <h2>📋 当前选择 <span id="selected-count-badge">0</span>台</h2>
-                            <div id="selected-vms-list"></div>
+                    </aside>
+
+                    <div class="main-panel">
+                        <div class="card batch-panel">
+                            <div class="card-header">
+                                <h2 class="card-title">
+                                    <span class="icon">⚡</span>
+                                    批量操作
+                                </h2>
+                                <span id="execution-badge" class="execution-badge" style="display: none;">
+                                    ⏱ <span id="execution-time">0秒</span>
+                                </span>
+                            </div>
+                            <div class="delay-control">
+                                <div class="delay-label">
+                                    <span>操作间隔</span>
+                                    <span class="delay-value"><span id="delay-value">30</span> 秒</span>
+                                </div>
+                                <input type="range" id="delay-slider" class="delay-slider" min="0" max="60" value="30" step="5">
+                            </div>
+                            <div id="batch-progress" class="progress-container" style="display: none;">
+                                <div class="progress-bar">
+                                    <div id="batch-progress-fill" class="progress-fill" style="width: 0%"></div>
+                                </div>
+                                <div class="progress-text">
+                                    <span id="batch-progress-text">正在处理...</span>
+                                    <span>剩余 <span id="countdown-seconds">0</span> 秒</span>
+                                </div>
+                            </div>
+                            <div class="btn-group">
+                                <button class="btn btn-warning" id="suspend-btn" onclick="suspendSelectedVMs()">
+                                    <span>⏸</span> 挂起选中
+                                </button>
+                                <button class="btn btn-success" id="start-btn" onclick="startSelectedVMs()">
+                                    <span>▶</span> 启动选中
+                                </button>
+                                <button class="btn btn-secondary" id="refresh-batch-btn" onclick="refreshStatus()">
+                                    <span>🔄</span> 刷新
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">
+                                <h2 class="card-title">
+                                    <span class="icon">🖥️</span>
+                                    虚拟机概览
+                                </h2>
+                                <div class="card-actions">
+                                    <button class="btn btn-primary btn-sm" onclick="openSaveFavoriteModal()">
+                                        <span>💾</span> 保存选择
+                                    </button>
+                                    <button class="btn btn-secondary btn-sm" onclick="selectAllVMs()">
+                                        <span>☑️</span> 全选
+                                    </button>
+                                    <button class="btn btn-ghost btn-sm" onclick="deselectAllVMs()">
+                                        <span>☐</span> 取消
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="vm-toolbar">
+                                <div class="search-box">
+                                    <span class="icon">🔍</span>
+                                    <input type="text" id="vm-search" placeholder="搜索虚拟机..." oninput="filterVMs()">
+                                    <button class="btn btn-ghost btn-icon" onclick="resetSearch()">✕</button>
+                                </div>
+                            </div>
+                            <div id="vm-overview" class="vm-grid">
+                                <div class="empty-state">
+                                    <span class="icon">📡</span>
+                                    <h3>等待加载</h3>
+                                    <p class="text-muted">点击刷新按钮加载虚拟机列表</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
+                </div>
+            </section>
 
-                    <div class="card batch-section">
-                        <h2>⚡ 批量操作</h2>
-                        <div class="delay-control">
-                            <label>间隔时间: <span id="delay-value">30</span>秒</label>
-                            <input type="range" id="delay-slider" min="0" max="60" value="30" step="5">
-                        </div>
-                        <div id="batch-progress" class="batch-progress" style="display: none;">
-                            <div class="progress-bar-container">
-                                <div id="batch-progress-fill" class="progress-fill" style="width: 0%"></div>
-                            </div>
-                            <div id="batch-progress-text" class="batch-progress-text">正在处理... 剩余 <span id="countdown-seconds">0</span> 秒</div>
-                        </div>
-                        <div class="action-buttons">
-                            <button class="btn btn-warning" id="suspend-btn" onclick="suspendSelectedVMs()">⏸ 挂起选中</button>
-                            <button class="btn btn-success" id="start-btn" onclick="startSelectedVMs()">▶ 启动选中</button>
-                            <button class="btn btn-secondary" id="refresh-batch-btn" onclick="refreshStatus()">🔄 刷新</button>
-                        </div>
-                    </div>
-
-                    <div class="card vms-section">
-                        <h2>
-                            🖥️ 虚拟机概览
-                            <div class="vm-header-actions">
-                                <button class="btn btn-sm btn-primary" onclick="openSaveFavoriteModal()">💾 保存选择</button>
-                                <button class="btn btn-sm btn-info" onclick="selectAllVMs()">☑️ 全选</button>
-                                <button class="btn btn-sm btn-secondary" onclick="deselectAllVMs()">☐ 取消</button>
-                            </div>
+            <section id="servers" class="tab-panel">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            <span class="icon">🖧</span>
+                            服务器状态
                         </h2>
-                        <div class="vm-search-box">
-                            <span class="search-icon">🔍</span>
-                            <input type="text" id="vm-search" placeholder="搜索虚拟机..." oninput="filterVMs()">
-                            <button class="btn btn-sm btn-secondary" onclick="resetSearch()">✕</button>
-                        </div>
-                        <div id="vm-overview">
-                            <p class="text-muted">点击刷新按钮加载虚拟机列表</p>
+                    </div>
+                    <div id="server-list" class="server-grid">
+                        <div class="empty-state">
+                            <span class="icon">🔄</span>
+                            <p class="text-muted">加载中...</p>
                         </div>
                     </div>
                 </div>
             </section>
 
-            <section id="servers" class="tab-content">
+            <section id="vms" class="tab-panel">
                 <div class="card">
-                    <h2>🖧 服务器状态</h2>
-                    <div id="server-list">
-                        <p class="text-muted">加载中...</p>
+                    <div class="card-header">
+                        <h2 class="card-title" id="vms-tab-title">
+                            <span class="icon">🖥️</span>
+                            虚拟机列表
+                        </h2>
                     </div>
-                </div>
-            </section>
-
-            <section id="vms" class="tab-content">
-                <div class="card">
-                    <h2 id="vms-tab-title">🖥️ 虚拟机列表</h2>
                     <div class="vm-toolbar">
-                        <div class="action-buttons">
-                            <button class="btn btn-warning btn-sm" onclick="suspendSelectedVMs()">⏸ 挂起选中</button>
-                            <button class="btn btn-success btn-sm" onclick="startSelectedVMs()">▶ 启动选中</button>
+                        <div class="btn-group">
+                            <button class="btn btn-warning btn-sm" onclick="suspendSelectedVMs()">
+                                <span>⏸</span> 挂起选中
+                            </button>
+                            <button class="btn btn-success btn-sm" onclick="startSelectedVMs()">
+                                <span>▶</span> 启动选中
+                            </button>
                         </div>
                     </div>
-                    <div id="vm-list">
-                        <p class="text-muted">加载中...</p>
+                    <div id="vm-list" class="vm-grid">
+                        <div class="empty-state">
+                            <span class="icon">🔄</span>
+                            <p class="text-muted">加载中...</p>
+                        </div>
                     </div>
                 </div>
             </section>
 
-            <section id="credentials" class="tab-content">
+            <section id="credentials" class="tab-panel">
                 <div class="card">
-                    <h2>🔐 连接配置</h2>
-                    <p class="text-muted">可配置多台ESXi服务器，同时管理</p>
-                    <div id="credentials-list">
-                        <p class="text-muted">暂无配置</p>
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            <span class="icon">🔐</span>
+                            连接配置
+                        </h2>
+                        <button class="btn btn-primary btn-sm" onclick="openAddCredentialModal()">
+                            <span>➕</span> 添加服务器
+                        </button>
                     </div>
-                    <button class="btn btn-primary" onclick="openAddCredentialModal()">➕ 添加服务器</button>
+                    <p class="text-muted" style="margin-bottom: 16px;">可配置多台ESXi服务器，同时管理</p>
+                    <div id="credentials-list" class="credential-list">
+                        <div class="empty-state">
+                            <span class="icon">🖥️</span>
+                            <p class="text-muted">暂无配置</p>
+                        </div>
+                    </div>
                 </div>
             </section>
 
-            <section id="logs" class="tab-content">
+            <section id="logs" class="tab-panel">
                 <div class="card">
-                    <h2>📋 系统日志</h2>
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            <span class="icon">📋</span>
+                            系统日志
+                        </h2>
+                    </div>
                     <div class="log-controls">
-                        <button class="btn btn-secondary" onclick="refreshLogs()">🔄 刷新</button>
-                        <button class="btn btn-secondary" id="log-auto-btn" onclick="toggleLogAutoRefresh(this)">▶ 自动刷新</button>
-                        <button class="btn btn-secondary" onclick="clearLogs()">🗑️ 清空</button>
+                        <button class="btn btn-secondary btn-sm" onclick="refreshLogs()">
+                            <span>🔄</span> 刷新
+                        </button>
+                        <button class="btn btn-secondary btn-sm" id="log-auto-btn" onclick="toggleLogAutoRefresh(this)">
+                            <span>▶</span> 自动刷新
+                        </button>
+                        <button class="btn btn-danger btn-sm" onclick="clearLogs()">
+                            <span>🗑️</span> 清空
+                        </button>
                     </div>
-                    <pre id="log-content" class="log-content">加载中...</pre>
+                    <div id="log-content" class="log-container">加载中...</div>
                 </div>
             </section>
 
-            <section id="scheduler" class="tab-content">
+            <section id="scheduler" class="tab-panel">
                 <div class="card">
-                    <h2>⏰ 定时任务管理</h2>
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            <span class="icon">⏰</span>
+                            定时任务管理
+                        </h2>
+                    </div>
                 </div>
 
                 <div class="card">
-                    <h3>➕ 新建任务</h3>
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <span class="icon">➕</span>
+                            新建任务
+                        </h3>
+                    </div>
                     <div class="task-form">
-                        <div class="form-row">
+                        <div class="task-form-row">
                             <div class="form-group">
-                                <label>任务名称</label>
-                                <input type="text" id="new-task-name" placeholder="例如: 工作日早上启动">
+                                <label class="form-label">任务名称</label>
+                                <input type="text" id="new-task-name" class="form-input" placeholder="例如: 工作日早上启动">
                             </div>
                             <div class="form-group">
-                                <label>执行动作</label>
-                                <select id="new-task-action">
+                                <label class="form-label">执行动作</label>
+                                <select id="new-task-action" class="form-select">
                                     <option value="start">▶ 启动</option>
                                     <option value="stop">⏹ 停止</option>
                                     <option value="suspend">⏸ 挂起</option>
                                 </select>
                             </div>
                         </div>
-                        <div class="form-row">
+                        <div class="task-form-row">
                             <div class="form-group">
-                                <label>执行时间</label>
-                                <input type="time" id="new-task-time" value="09:00">
+                                <label class="form-label">执行时间</label>
+                                <input type="time" id="new-task-time" class="form-input" value="09:00">
                             </div>
                             <div class="form-group">
-                                <label>执行日期</label>
-                                <div class="day-selector-inline">
-                                    <label><input type="checkbox" name="new-task-days" value="0" checked> 一</label>
-                                    <label><input type="checkbox" name="new-task-days" value="1" checked> 二</label>
-                                    <label><input type="checkbox" name="new-task-days" value="2" checked> 三</label>
-                                    <label><input type="checkbox" name="new-task-days" value="3" checked> 四</label>
-                                    <label><input type="checkbox" name="new-task-days" value="4" checked> 五</label>
-                                    <label><input type="checkbox" name="new-task-days" value="5"> 六</label>
-                                    <label><input type="checkbox" name="new-task-days" value="6"> 日</label>
+                                <label class="form-label">执行日期</label>
+                                <div class="day-selector">
+                                    <label class="day-chip selected"><input type="checkbox" name="new-task-days" value="0" checked style="display:none;"> 一</label>
+                                    <label class="day-chip selected"><input type="checkbox" name="new-task-days" value="1" checked style="display:none;"> 二</label>
+                                    <label class="day-chip selected"><input type="checkbox" name="new-task-days" value="2" checked style="display:none;"> 三</label>
+                                    <label class="day-chip selected"><input type="checkbox" name="new-task-days" value="3" checked style="display:none;"> 四</label>
+                                    <label class="day-chip selected"><input type="checkbox" name="new-task-days" value="4" checked style="display:none;"> 五</label>
+                                    <label class="day-chip"><input type="checkbox" name="new-task-days" value="5" style="display:none;"> 六</label>
+                                    <label class="day-chip"><input type="checkbox" name="new-task-days" value="6" style="display:none;"> 日</label>
                                 </div>
                             </div>
                         </div>
                         <div class="form-group">
-                            <label>选择虚拟机</label>
+                            <label class="form-label">选择虚拟机</label>
                             <div id="new-task-vms" class="task-vm-selector"></div>
                         </div>
                         <div class="form-group">
-                            <label><input type="checkbox" id="new-task-notify"> 启用微信通知</label>
+                            <label class="day-chip" style="padding: 12px 16px;">
+                                <input type="checkbox" id="new-task-notify" style="margin-right: 8px;"> 启用微信通知
+                            </label>
                         </div>
                         <div id="new-task-wechat-config" class="form-group" style="display:none;">
-                            <label>企业微信 Webhook URL</label>
-                            <input type="text" id="new-task-wechat-url" placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx">
+                            <label class="form-label">企业微信 Webhook URL</label>
+                            <input type="text" id="new-task-wechat-url" class="form-input" placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx">
                         </div>
-                        <div class="form-actions">
-                            <button class="btn btn-primary" id="new-task-submit-btn" onclick="createTask()">创建任务</button>
-                            <button class="btn btn-secondary" id="new-task-cancel-btn" onclick="cancelEditTask()" style="display:none;">取消</button>
+                        <div class="btn-group">
+                            <button class="btn btn-primary" id="new-task-submit-btn" onclick="createTask()">
+                                <span>✓</span> 创建任务
+                            </button>
+                            <button class="btn btn-secondary" id="new-task-cancel-btn" onclick="cancelEditTask()" style="display:none;">
+                                <span>✕</span> 取消
+                            </button>
                         </div>
                     </div>
                 </div>
 
                 <div class="card">
-                    <h3>📋 任务列表</h3>
-                    <div id="tasks-list">
-                        <p class="text-muted">暂无定时任务</p>
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <span class="icon">📋</span>
+                            任务列表
+                        </h3>
+                    </div>
+                    <div id="tasks-list" class="task-list">
+                        <div class="empty-state">
+                            <span class="icon">⏰</span>
+                            <p class="text-muted">暂无定时任务</p>
+                        </div>
                     </div>
                 </div>
             </section>
         </main>
     </div>
 
-    <div id="save-favorite-modal" class="modal">
+    <div id="save-favorite-modal" class="modal-overlay">
         <div class="modal-content">
-            <h3>💾 保存收藏</h3>
+            <div class="modal-header">
+                <h3 class="modal-title">
+                    <span>💾</span>
+                    保存收藏
+                </h3>
+            </div>
             <div class="form-group">
-                <label for="favorite-name">收藏名称:</label>
-                <input type="text" id="favorite-name" placeholder="例如: 开发环境">
+                <label class="form-label">收藏名称</label>
+                <input type="text" id="favorite-name" class="form-input" placeholder="例如: 开发环境">
             </div>
-            <div class="selected-vms-preview">
-                <p>已选择 <span id="selected-count">0</span> 台虚拟机:</p>
-                <div id="selected-vms-names" class="selected-vms-names"></div>
+            <div class="form-group">
+                <label class="form-label">已选择 <span id="selected-count">0</span> 台虚拟机:</label>
+                <div id="selected-vms-names" class="task-vm-selector" style="max-height: 100px;"></div>
             </div>
-            <div class="modal-buttons">
-                <button class="btn btn-primary" onclick="confirmSaveFavorite()">保存</button>
-                <button class="btn btn-secondary" onclick="closeSaveFavoriteModal()">取消</button>
+            <div class="btn-group" style="justify-content: flex-end;">
+                <button class="btn btn-primary" onclick="confirmSaveFavorite()">
+                    <span>✓</span> 保存
+                </button>
+                <button class="btn btn-secondary" onclick="closeSaveFavoriteModal()">
+                    <span>✕</span> 取消
+                </button>
             </div>
         </div>
     </div>
 
-    <div id="add-credential-modal" class="modal">
+    <div id="add-credential-modal" class="modal-overlay">
         <div class="modal-content">
-            <h3>🖥️ 添加服务器</h3>
-            <div class="form-group">
-                <label for="server-name">服务器名称:</label>
-                <input type="text" id="server-name" placeholder="例如: ESXi-主服务器">
+            <div class="modal-header">
+                <h3 class="modal-title">
+                    <span>🖥️</span>
+                    添加服务器
+                </h3>
             </div>
             <div class="form-group">
-                <label for="server-host">ESXi 主机地址:</label>
-                <input type="text" id="server-host" placeholder="192.168.1.100">
+                <label class="form-label">服务器名称</label>
+                <input type="text" id="server-name" class="form-input" placeholder="例如: ESXi-主服务器">
             </div>
             <div class="form-group">
-                <label for="server-username">用户名:</label>
-                <input type="text" id="server-username" placeholder="root">
+                <label class="form-label">ESXi 主机地址</label>
+                <input type="text" id="server-host" class="form-input" placeholder="192.168.1.100">
             </div>
             <div class="form-group">
-                <label for="server-password">密码:</label>
-                <input type="password" id="server-password">
+                <label class="form-label">用户名</label>
+                <input type="text" id="server-username" class="form-input" placeholder="root">
             </div>
-            <div class="modal-buttons">
-                <button class="btn btn-primary" onclick="confirmAddCredential()">添加</button>
-                <button class="btn btn-secondary" onclick="closeAddCredentialModal()">取消</button>
+            <div class="form-group">
+                <label class="form-label">密码</label>
+                <input type="password" id="server-password" class="form-input">
+            </div>
+            <div class="btn-group" style="justify-content: flex-end;">
+                <button class="btn btn-primary" onclick="confirmAddCredential()">
+                    <span>✓</span> 添加
+                </button>
+                <button class="btn btn-secondary" onclick="closeAddCredentialModal()">
+                    <span>✕</span> 取消
+                </button>
             </div>
         </div>
     </div>
 
-    <div id="toast" class="toast"></div>
+    <div id="toast" class="toast-container"></div>
 
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
