@@ -43,27 +43,30 @@
             <section id="dashboard" class="tab-content active">
                 <div class="dashboard-grid">
                     <div class="card favorites-section">
-                        <h2>⭐ 快捷收藏</h2>
+                        <div class="card-header">
+                            <h2 class="card-title">⭐ 快捷收藏</h2>
+                        </div>
                         <div id="favorites-quick">
                             <p class="text-muted">暂无收藏</p>
-                        </div>
-                        <div class="selected-vms-preview" id="selected-vms-preview" style="display:none;">
-                            <h2>📋 当前选择 <span id="selected-count-badge">0</span>台</h2>
-                            <div id="selected-vms-list"></div>
                         </div>
                     </div>
 
                     <div class="card batch-section">
-                        <h2>⚡ 批量操作</h2>
+                        <div class="card-header">
+                            <h2 class="card-title">⚡ 批量操作</h2>
+                        </div>
                         <div class="delay-control">
-                            <label>间隔时间: <span id="delay-value">30</span>秒</label>
-                            <input type="range" id="delay-slider" min="0" max="60" value="30" step="5">
+                            <div class="delay-label">
+                                <span>间隔时间</span>
+                                <span class="delay-value"><span id="delay-value">30</span>秒</span>
+                            </div>
+                            <input type="range" id="delay-slider" class="delay-slider" min="0" max="60" value="30" step="5">
                         </div>
                         <div id="batch-progress" class="batch-progress" style="display: none;">
                             <div class="progress-bar-container">
                                 <div id="batch-progress-fill" class="progress-fill" style="width: 0%"></div>
                             </div>
-                            <div id="batch-progress-text" class="batch-progress-text">正在处理... 剩余 <span id="countdown-seconds">0</span> 秒</div>
+                            <div class="progress-text">正在处理... 剩余 <span id="countdown-seconds">0</span> 秒</div>
                         </div>
                         <div class="action-buttons">
                             <button class="btn btn-warning" id="suspend-btn" onclick="suspendSelectedVMs()">⏸ 挂起选中</button>
@@ -72,22 +75,32 @@
                         </div>
                     </div>
 
+                    <div class="card selected-vms-preview" id="selected-vms-preview" style="display:none;">
+                        <div class="card-header">
+                            <h2 class="card-title">📋 当前选择 <span id="selected-count-badge">0</span>台</h2>
+                        </div>
+                        <div id="selected-vms-list"></div>
+                    </div>
+
                     <div class="card vms-section">
-                        <h2>
-                            🖥️ 虚拟机概览
+                        <div class="vm-header">
+                            <h2 class="vm-header-title">🖥️ 虚拟机概览</h2>
                             <div class="vm-header-actions">
                                 <button class="btn btn-sm btn-primary" onclick="openSaveFavoriteModal()">💾 保存选择</button>
                                 <button class="btn btn-sm btn-info" onclick="selectAllVMs()">☑️ 全选</button>
                                 <button class="btn btn-sm btn-secondary" onclick="deselectAllVMs()">☐ 取消</button>
                             </div>
-                        </h2>
+                        </div>
                         <div class="vm-search-box">
-                            <span class="search-icon">🔍</span>
+                            <span class="search-icon vm-search-icon">🔍</span>
                             <input type="text" id="vm-search" placeholder="搜索虚拟机..." oninput="filterVMs()">
                             <button class="btn btn-sm btn-secondary" onclick="resetSearch()">✕</button>
                         </div>
                         <div id="vm-overview">
-                            <p class="text-muted">点击刷新按钮加载虚拟机列表</p>
+                            <div class="empty-state">
+                                <div class="icon">🖥️</div>
+                                <p>点击刷新按钮加载虚拟机列表</p>
+                            </div>
                         </div>
                     </div>
                 </div>
