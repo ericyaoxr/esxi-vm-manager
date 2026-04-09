@@ -39,17 +39,6 @@
         <main>
             <section id="dashboard" class="tab-content active">
                 <div class="dashboard-grid">
-                    <div class="card favorites-section">
-                        <h2>⭐ 快捷收藏</h2>
-                        <div id="favorites-quick">
-                            <p class="text-muted">暂无收藏</p>
-                        </div>
-                        <div class="selected-vms-preview" id="selected-vms-preview" style="display:none;">
-                            <h2>📋 当前选择 <span id="selected-count-badge">0</span>台</h2>
-                            <div id="selected-vms-list"></div>
-                        </div>
-                    </div>
-
                     <div class="card batch-section">
                         <h2>⚡ 批量操作</h2>
                         <div class="delay-control">
@@ -69,6 +58,21 @@
                         </div>
                     </div>
 
+                    <div class="card favorites-section">
+                        <h2>⭐ 快捷收藏</h2>
+                        <div id="favorites-quick">
+                            <div class="empty-state">
+                                <span class="empty-icon">⭐</span>
+                                <p class="empty-text">暂无收藏</p>
+                                <p class="empty-hint">选择虚拟机后点击"💾 保存选择"</p>
+                            </div>
+                        </div>
+                        <div class="selected-vms-preview" id="selected-vms-preview" style="display:none;">
+                            <h2>📋 当前选择 <span id="selected-count-badge">0</span>台</h2>
+                            <div id="selected-vms-list"></div>
+                        </div>
+                    </div>
+
                     <div class="card vms-section">
                         <h2>
                             🖥️ 虚拟机概览
@@ -84,7 +88,11 @@
                             <button class="btn btn-sm btn-secondary" onclick="resetSearch()">✕</button>
                         </div>
                         <div id="vm-overview">
-                            <p class="text-muted">点击刷新按钮加载虚拟机列表</p>
+                            <div class="empty-state">
+                                <span class="empty-icon">🖥️</span>
+                                <p class="empty-text">点击刷新按钮加载虚拟机列表</p>
+                                <p class="empty-hint">或切换到"虚拟机"标签页管理</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -94,7 +102,11 @@
                 <div class="card">
                     <h2>🖧 服务器状态</h2>
                     <div id="server-list">
-                        <p class="text-muted">加载中...</p>
+                        <div class="empty-state">
+                            <span class="empty-icon">🖧</span>
+                            <p class="empty-text">暂无服务器</p>
+                            <p class="empty-hint">请先在"连接配置"中添加服务器</p>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -109,7 +121,11 @@
                         </div>
                     </div>
                     <div id="vm-list">
-                        <p class="text-muted">加载中...</p>
+                        <div class="empty-state">
+                            <span class="empty-icon">🖥️</span>
+                            <p class="empty-text">暂无虚拟机数据</p>
+                            <p class="empty-hint">请确保服务器连接正常</p>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -117,9 +133,12 @@
             <section id="credentials" class="tab-content">
                 <div class="card">
                     <h2>🔐 连接配置</h2>
-                    <p class="text-muted">可配置多台ESXi服务器，同时管理</p>
                     <div id="credentials-list">
-                        <p class="text-muted">暂无配置</p>
+                        <div class="empty-state">
+                            <span class="empty-icon">🔐</span>
+                            <p class="empty-text">暂无连接配置</p>
+                            <p class="empty-hint">点击下方按钮添加ESXi服务器</p>
+                        </div>
                     </div>
                     <button class="btn btn-primary" onclick="openAddCredentialModal()">➕ 添加服务器</button>
                 </div>
@@ -133,7 +152,7 @@
                         <button class="btn btn-secondary" id="log-auto-btn" onclick="toggleLogAutoRefresh(this)">▶ 自动刷新</button>
                         <button class="btn btn-secondary" onclick="clearLogs()">🗑️ 清空</button>
                     </div>
-                    <pre id="log-content" class="log-content">加载中...</pre>
+                    <pre id="log-content" class="log-content">暂无日志记录</pre>
                 </div>
             </section>
 
@@ -198,7 +217,11 @@
                 <div class="card">
                     <h3>📋 任务列表</h3>
                     <div id="tasks-list">
-                        <p class="text-muted">暂无定时任务</p>
+                        <div class="empty-state">
+                            <span class="empty-icon">⏰</span>
+                            <p class="empty-text">暂无定时任务</p>
+                            <p class="empty-hint">在下方创建新的定时任务</p>
+                        </div>
                     </div>
                 </div>
             </section>
