@@ -11,7 +11,7 @@
     <div class="container">
         <header>
             <div class="logo">
-                <svg width="40" height="40" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <rect x="2" y="4" width="32" height="24" rx="3" stroke="white" stroke-width="2" fill="none"/>
                     <rect x="6" y="8" width="8" height="6" rx="1" fill="white" opacity="0.8"/>
                     <rect x="16" y="8" width="8" height="6" rx="1" fill="white" opacity="0.6"/>
@@ -19,11 +19,8 @@
                     <circle cx="28" cy="26" r="3" fill="#10b981"/>
                     <circle cx="28" cy="26" r="1.5" fill="white"/>
                 </svg>
-                <div class="logo-text">
-                    <span class="logo-title">ESXi 虚拟机管理器</span>
-                    <span class="logo-subtitle">VMware 虚拟机管理控制台</span>
-                </div>
             </div>
+            <h1>ESXi 虚拟机管理器</h1>
             <div class="connection-status">
                 <span id="connection-indicator" class="status-dot"></span>
                 <span id="connection-text">检测中...</span>
@@ -43,30 +40,27 @@
             <section id="dashboard" class="tab-content active">
                 <div class="dashboard-grid">
                     <div class="card favorites-section">
-                        <div class="card-header">
-                            <h2 class="card-title">⭐ 快捷收藏</h2>
-                        </div>
+                        <h2>⭐ 快捷收藏</h2>
                         <div id="favorites-quick">
                             <p class="text-muted">暂无收藏</p>
+                        </div>
+                        <div class="selected-vms-preview" id="selected-vms-preview" style="display:none;">
+                            <h2>📋 当前选择 <span id="selected-count-badge">0</span>台</h2>
+                            <div id="selected-vms-list"></div>
                         </div>
                     </div>
 
                     <div class="card batch-section">
-                        <div class="card-header">
-                            <h2 class="card-title">⚡ 批量操作</h2>
-                        </div>
+                        <h2>⚡ 批量操作</h2>
                         <div class="delay-control">
-                            <div class="delay-label">
-                                <span>间隔时间</span>
-                                <span class="delay-value"><span id="delay-value">30</span>秒</span>
-                            </div>
-                            <input type="range" id="delay-slider" class="delay-slider" min="0" max="60" value="30" step="5">
+                            <label>间隔时间: <span id="delay-value">30</span>秒</label>
+                            <input type="range" id="delay-slider" min="0" max="60" value="30" step="5">
                         </div>
                         <div id="batch-progress" class="batch-progress" style="display: none;">
                             <div class="progress-bar-container">
                                 <div id="batch-progress-fill" class="progress-fill" style="width: 0%"></div>
                             </div>
-                            <div class="progress-text">正在处理... 剩余 <span id="countdown-seconds">0</span> 秒</div>
+                            <div id="batch-progress-text" class="batch-progress-text">正在处理... 剩余 <span id="countdown-seconds">0</span> 秒</div>
                         </div>
                         <div class="action-buttons">
                             <button class="btn btn-warning" id="suspend-btn" onclick="suspendSelectedVMs()">⏸ 挂起选中</button>
@@ -75,32 +69,22 @@
                         </div>
                     </div>
 
-                    <div class="card selected-vms-preview" id="selected-vms-preview" style="display:none;">
-                        <div class="card-header">
-                            <h2 class="card-title">📋 当前选择 <span id="selected-count-badge">0</span>台</h2>
-                        </div>
-                        <div id="selected-vms-list"></div>
-                    </div>
-
                     <div class="card vms-section">
-                        <div class="vm-header">
-                            <h2 class="vm-header-title">🖥️ 虚拟机概览</h2>
+                        <h2>
+                            🖥️ 虚拟机概览
                             <div class="vm-header-actions">
                                 <button class="btn btn-sm btn-primary" onclick="openSaveFavoriteModal()">💾 保存选择</button>
                                 <button class="btn btn-sm btn-info" onclick="selectAllVMs()">☑️ 全选</button>
                                 <button class="btn btn-sm btn-secondary" onclick="deselectAllVMs()">☐ 取消</button>
                             </div>
-                        </div>
+                        </h2>
                         <div class="vm-search-box">
-                            <span class="search-icon vm-search-icon">🔍</span>
+                            <span class="search-icon">🔍</span>
                             <input type="text" id="vm-search" placeholder="搜索虚拟机..." oninput="filterVMs()">
                             <button class="btn btn-sm btn-secondary" onclick="resetSearch()">✕</button>
                         </div>
                         <div id="vm-overview">
-                            <div class="empty-state">
-                                <div class="icon">🖥️</div>
-                                <p>点击刷新按钮加载虚拟机列表</p>
-                            </div>
+                            <p class="text-muted">点击刷新按钮加载虚拟机列表</p>
                         </div>
                     </div>
                 </div>
