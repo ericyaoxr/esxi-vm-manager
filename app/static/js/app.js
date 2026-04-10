@@ -1292,6 +1292,16 @@ function showHelp() {
     if (credentialsBtn) credentialsBtn.click();
 }
 
+function openSettingsModal() {
+    const modal = document.getElementById('settings-modal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeSettingsModal() {
+    const modal = document.getElementById('settings-modal');
+    if (modal) modal.style.display = 'none';
+}
+
 async function testConnection() {
     const name = document.getElementById('server-name').value.trim();
     const host = document.getElementById('server-host').value.trim();
@@ -2081,9 +2091,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     break;
                 case 'vms':
                     loadVMs();
-                    stopLogAutoRefresh();
-                    break;
-                case 'settings':
                     stopLogAutoRefresh();
                     break;
                 case 'dashboard':

@@ -33,6 +33,7 @@
                 <span id="connection-indicator" class="status-dot"></span>
                 <span id="connection-text">检测中...</span>
             </div>
+            <button class="header-settings-btn" onclick="openSettingsModal()" title="系统设置">⚙️</button>
         </header>
 
         <nav>
@@ -41,7 +42,6 @@
             <button class="nav-btn" data-tab="vms">🖧 虚拟机</button>
             <button class="nav-btn" data-tab="scheduler">⏰ 定时任务</button>
             <button class="nav-btn" data-tab="credentials">🔑 连接配置</button>
-            <button class="nav-btn" data-tab="settings">⚙️ 系统设置</button>
             <button class="nav-btn" data-tab="logs">📋 日志</button>
         </nav>
 
@@ -165,12 +165,12 @@
                 </div>
             </section>
 
-            <section id="settings" class="tab-content">
-                <div class="card">
-                    <h2>⚙️ 系统设置</h2>
+            <div id="settings-modal" class="modal">
+                <div class="modal-content">
+                    <h3>⚙️ 系统设置</h3>
                     <div class="settings-section">
-                        <h3>🔀 排序设置</h3>
-                        <p class="settings-desc">支持名称中包含数字的自然排序（如 vm1, vm2, vm10 会按数字大小排序，而非字典序）</p>
+                        <h4>🔀 排序设置</h4>
+                        <p class="settings-desc">支持名称中包含数字的自然排序（如 vm1, vm2, vm10 会按数字大小排序）</p>
                         <div class="setting-item">
                             <label>
                                 <input type="checkbox" id="setting-natural-sort" onchange="toggleNaturalSort(this.checked)">
@@ -179,12 +179,15 @@
                         </div>
                     </div>
                     <div class="settings-section">
-                        <h3>ℹ️ 关于系统</h3>
+                        <h4>ℹ️ 关于系统</h4>
                         <p>ESXi 虚拟机管理器 v1.0</p>
                         <p class="text-muted">基于 Flask + Vue.js 构建</p>
                     </div>
+                    <div class="modal-buttons">
+                        <button class="btn btn-primary" onclick="closeSettingsModal()">关闭</button>
+                    </div>
                 </div>
-            </section>
+            </div>
 
             <section id="scheduler" class="tab-content">
                 <div class="card">
