@@ -71,8 +71,8 @@
                         <div id="favorites-quick">
                             <div class="empty-state">
                                 <span class="empty-icon">⭐</span>
-                                <p class="empty-text">暂无收藏</p>
-                                <p class="empty-hint">选择虚拟机后点击"💾 保存选择"</p>
+                                <p class="empty-text">还没有收藏组合</p>
+                                <p class="empty-hint">选择虚拟机后点击「💾 保存选择」可快速创建收藏</p>
                             </div>
                         </div>
                         <div class="selected-vms-preview" id="selected-vms-preview" style="display:none;">
@@ -98,8 +98,8 @@
                         <div id="vm-overview">
                             <div class="empty-state">
                                 <span class="empty-icon">🖥️</span>
-                                <p class="empty-text">点击刷新按钮加载虚拟机列表</p>
-                                <p class="empty-hint">或切换到"虚拟机"标签页管理</p>
+                                <p class="empty-text">还没有虚拟机</p>
+                                <p class="empty-hint">请先在「连接配置」中添加 ESXi 服务器，然后点击「🔄 刷新」加载</p>
                             </div>
                         </div>
                     </div>
@@ -112,8 +112,8 @@
                     <div id="server-list">
                         <div class="empty-state">
                             <span class="empty-icon">🖧</span>
-                            <p class="empty-text">暂无服务器</p>
-                            <p class="empty-hint">请先在"连接配置"中添加服务器</p>
+                            <p class="empty-text">还没有配置服务器</p>
+                            <p class="empty-hint">点击「连接配置」标签添加您的第一台 ESXi 服务器</p>
                         </div>
                     </div>
                 </div>
@@ -132,7 +132,7 @@
                         <div class="empty-state">
                             <span class="empty-icon">🖥️</span>
                             <p class="empty-text">暂无虚拟机数据</p>
-                            <p class="empty-hint">请确保服务器连接正常</p>
+                            <p class="empty-hint">请确保已在「连接配置」中添加服务器并刷新</p>
                         </div>
                     </div>
                 </div>
@@ -144,8 +144,8 @@
                     <div id="credentials-list">
                         <div class="empty-state">
                             <span class="empty-icon">🔐</span>
-                            <p class="empty-text">暂无连接配置</p>
-                            <p class="empty-hint">点击下方按钮添加ESXi服务器</p>
+                            <p class="empty-text">还没有配置服务器</p>
+                            <p class="empty-hint">点击下方按钮添加您的第一台 ESXi 服务器</p>
                         </div>
                     </div>
                     <button class="btn btn-primary" onclick="openAddCredentialModal()">➕ 添加服务器</button>
@@ -229,6 +229,37 @@
         </main>
     </div>
 
+    <div id="welcome-modal" class="modal">
+        <div class="modal-content">
+            <h3>👋 欢迎使用 ESXi 虚拟机管理器</h3>
+            <div class="welcome-content">
+                <p>开始使用前请确认：</p>
+                <ul>
+                    <li>✓ 拥有 ESXi 服务器地址</li>
+                    <li>✓ 拥有 ESXi 账号密码</li>
+                    <li>✓ 网络可访问 ESXi 服务器</li>
+                </ul>
+                <div class="welcome-divider"></div>
+                <h4>快速开始</h4>
+                <ol>
+                    <li>点击「连接配置」添加 ESXi 服务器</li>
+                    <li>点击「🔄 刷新」加载虚拟机列表</li>
+                    <li>勾选虚拟机后点击「挂起」或「启动」</li>
+                    <li>使用「快捷收藏」保存常用组合</li>
+                </ol>
+                <div class="welcome-hint">
+                    <strong>术语说明：</strong><br>
+                    挂起 = 暂停虚拟机（保持内存状态）<br>
+                    关机 = 正常关闭虚拟机
+                </div>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn btn-primary" onclick="closeWelcomeModal()">开始使用</button>
+                <button class="btn btn-secondary" onclick="showHelp()">查看帮助</button>
+            </div>
+        </div>
+    </div>
+
     <div id="save-favorite-modal" class="modal">
         <div class="modal-content">
             <h3>💾 保存收藏</h3>
@@ -257,16 +288,20 @@
             <div class="form-group">
                 <label for="server-host">ESXi 主机地址:</label>
                 <input type="text" id="server-host" placeholder="192.168.1.100">
+                <small class="form-hint">输入 ESXi 服务器的 IP 地址或主机名</small>
             </div>
             <div class="form-group">
                 <label for="server-username">用户名:</label>
                 <input type="text" id="server-username" placeholder="root">
+                <small class="form-hint">通常使用 root 账户</small>
             </div>
             <div class="form-group">
                 <label for="server-password">密码:</label>
                 <input type="password" id="server-password">
             </div>
+            <div id="connection-test-result" class="connection-test-result" style="display:none;"></div>
             <div class="modal-buttons">
+                <button class="btn btn-secondary" onclick="testConnection()">🔗 测试连接</button>
                 <button class="btn btn-primary" onclick="confirmAddCredential()">添加</button>
                 <button class="btn btn-secondary" onclick="closeAddCredentialModal()">取消</button>
             </div>

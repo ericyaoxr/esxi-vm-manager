@@ -603,6 +603,11 @@ async function suspendSelectedVMs(event) {
         showToast(`已跳过 ${nonRunningVMs.length} 台非运行状态虚拟机`, 'info');
     }
 
+    if (runningVMs.length >= 5 && !confirm(`确定要挂起这 ${runningVMs.length} 台虚拟机吗？`)) {
+        isProcessing = false;
+        return;
+    }
+
     setBatchButtonsDisabled(true);
     setVmsButtonsDisabled(true);
     vmList.forEach(vm => setVMButtonsDisabled(vm.name, vm.server_host, true));
@@ -664,6 +669,11 @@ async function startSelectedVMs(event) {
 
     if (nonStartableVMs.length > 0) {
         showToast(`已跳过 ${nonStartableVMs.length} 台无法启动的虚拟机`, 'info');
+    }
+
+    if (startableVMs.length >= 5 && !confirm(`确定要启动这 ${startableVMs.length} 台虚拟机吗？`)) {
+        isProcessing = false;
+        return;
     }
 
     setBatchButtonsDisabled(true);
@@ -1204,6 +1214,8 @@ function openAddCredentialModal() {
     document.getElementById('server-host').value = '';
     document.getElementById('server-username').value = '';
     document.getElementById('server-password').value = '';
+    const testResult = document.getElementById('connection-test-result');
+    if (testResult) testResult.style.display = 'none';
 
     modal.style.display = 'flex';
 }
@@ -1211,6 +1223,64 @@ function openAddCredentialModal() {
 function closeAddCredentialModal() {
     const modal = document.getElementById('add-credential-modal');
     if (modal) modal.style.display = 'none';
+}
+
+function openWelcomeModal() {
+    const modal = document.getElementById('welcome-modal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeWelcomeModal() {
+    const modal = document.getElementById('welcome-modal');
+    if (modal) modal.style.display = 'none';
+    localStorage.setItem('welcomeShown', 'true');
+}
+
+function showHelp() {
+    closeWelcomeModal();
+    switchTab('credentials');
+}
+
+async function testConnection() {
+    const name = document.getElementById('server-name').value.trim();
+    const host = document.getElementById('server-host').value.trim();
+    const username = document.getElementById('server-username').value.trim();
+    const password = document.getElementById('server-password').value;
+
+    const resultDiv = document.getElementById('connection-test-result');
+    if (!host || !username || !password) {
+        resultDiv.className = 'connection-test-result error';
+        resultDiv.textContent = '请填写完整信息后再测试';
+        resultDiv.style.display = 'block';
+        return;
+    }
+
+    resultDiv.className = 'connection-test-result testing';
+    resultDiv.textContent = '正在测试连接...';
+    resultDiv.style.display = 'block';
+
+    const testServer = { name, host, username, password };
+    const result = await apiRequest('/servers/check', {
+        method: 'POST',
+        body: JSON.stringify({ server: testServer })
+    });
+
+    if (result.success) {
+        resultDiv.className = 'connection-test-result success';
+        resultDiv.textContent = '✅ 连接成功！服务器信息正确';
+    } else {
+        resultDiv.className = 'connection-test-result error';
+        const errorMsg = result.error || '连接失败';
+        let hint = '';
+        if (errorMsg.includes('getaddrinfo') || errorMsg.includes('Name or service not known')) {
+            hint = '（请检查 IP 地址是否正确）';
+        } else if (errorMsg.includes('authentication') || errorMsg.includes('password')) {
+            hint = '（请检查用户名和密码）';
+        } else if (errorMsg.includes('connection')) {
+            hint = '（请检查网络是否畅通）';
+        }
+        resultDiv.textContent = '❌ 连接失败: ' + errorMsg + hint;
+    }
 }
 
 async function confirmAddCredential() {
@@ -1274,7 +1344,7 @@ async function refreshLogs() {
         const logContent = document.getElementById('log-content');
 
         if (result && result.success && logContent) {
-            logContent.textContent = result.logs || '暂无日志';
+            logContent.textContent = result.logs || '暂无日志记录';
             logContent.scrollTop = logContent.scrollHeight;
         } else if (logContent) {
             logContent.textContent = '加载日志失败: ' + (result?.error || '未知错误');
@@ -1546,7 +1616,7 @@ async function loadTasks() {
                     </div>`;
             }).join('');
         } else {
-            tasksList.innerHTML = '<p class="text-muted">暂无定时任务</p>';
+            tasksList.innerHTML = '<p class="text-muted">还没有定时任务</p>';
         }
     } catch (e) {
         console.error('加载任务失败:', e);
@@ -2008,4 +2078,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     await loadSettings();
     await refreshStatus();
+
+    if (!localStorage.getItem('welcomeShown')) {
+        setTimeout(() => openWelcomeModal(), 500);
+    }
 });

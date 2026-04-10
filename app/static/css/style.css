@@ -788,6 +788,82 @@ nav {
     box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }
 
+.form-hint {
+    display: block;
+    margin-top: 4px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.connection-test-result {
+    padding: 10px 12px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    font-size: 0.9rem;
+}
+
+.connection-test-result.testing {
+    background: rgba(59, 130, 246, 0.1);
+    color: var(--info-color);
+}
+
+.connection-test-result.success {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--success-color);
+}
+
+.connection-test-result.error {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--danger-color);
+}
+
+.welcome-content {
+    padding: 10px 0;
+}
+
+.welcome-content p {
+    margin-bottom: 12px;
+}
+
+.welcome-content ul {
+    list-style: none;
+    padding-left: 0;
+    margin-bottom: 16px;
+}
+
+.welcome-content ul li {
+    padding: 4px 0;
+    color: var(--text-muted);
+}
+
+.welcome-content .welcome-divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: 16px 0;
+}
+
+.welcome-content h4 {
+    margin-bottom: 12px;
+    font-size: 1rem;
+}
+
+.welcome-content ol {
+    padding-left: 20px;
+    margin-bottom: 16px;
+}
+
+.welcome-content ol li {
+    padding: 4px 0;
+}
+
+.welcome-hint {
+    background: rgba(59, 130, 246, 0.1);
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    line-height: 1.6;
+}
+
 .form-actions {
     display: flex;
     gap: 10px;
