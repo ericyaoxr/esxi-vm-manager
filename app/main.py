@@ -748,8 +748,15 @@ def api_vm_performance(vm_name):
         try:
             counter_map = {}
             for counter in perf_manager.perfCounter:
-                counter_key = f"{counter.group}.{counter.name}.{counter.rollupType}"
-                counter_map[counter_key] = counter.key
+                try:
+                    counter_group = getattr(counter, 'group', '')
+                    counter_name = getattr(counter, 'name', '')
+                    counter_rollup = getattr(counter, 'rollupType', '')
+                    if counter_group and counter_name:
+                        counter_key = f"{counter_group}.{counter_name}.{counter_rollup}"
+                        counter_map[counter_key] = counter.key
+                except Exception:
+                    continue
 
             metric_keys = {
                 'cpu.usage.average': 'cpu',
@@ -802,10 +809,10 @@ def api_vm_performance(vm_name):
 
         try:
             quick_stats = vm_obj.summary.quickStats
-            overall_cpu = getattr(quick_stats, 'overallCpuUsage', 0)
-            guest_cpu = getattr(quick_stats, 'guestCpuUsage', 0)
+            overall_cpu = getattr(quick_stats, 'overallCpuUsage', None)
+            guest_cpu = getattr(quick_stats, 'guestCpuUsage', None)
 
-            cpu_usage = overall_cpu if overall_cpu > 0 else guest_cpu
+            cpu_usage = overall_cpu if overall_cpu is not None and overall_cpu > 0 else (guest_cpu if guest_cpu is not None and guest_cpu > 0 else 0)
             if cpu_usage > 0 and vm_obj.summary.config.numCpu > 0:
                 realtime_stats['cpu_percent'] = min(round(cpu_usage / vm_obj.summary.config.numCpu, 1), 100)
 

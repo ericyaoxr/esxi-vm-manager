@@ -12,11 +12,33 @@ let servers = [];
 let selectedVMs = new Set();
 let favorites = [];
 let currentDelay = 30;
+let naturalSort = false;
 let currentFavoriteIndex = -1;
 let isProcessing = false;
 let serverDetailCache = null;
 let serverDetailCacheTime = 0;
 const SERVER_DETAIL_CACHE_DURATION = 30000;
+
+function naturalSortCompare(a, b) {
+    const numPattern = /(\d+)/g;
+    const partsA = a.split(numPattern);
+    const partsB = b.split(numPattern);
+
+    for (let i = 0; i < Math.max(partsA.length, partsB.length); i++) {
+        const partA = partsA[i] || '';
+        const partB = partsB[i] || '';
+
+        const numA = parseInt(partA, 10);
+        const numB = parseInt(partB, 10);
+
+        if (!isNaN(numA) && !isNaN(numB)) {
+            if (numA !== numB) return numA - numB;
+        } else if (partA !== partB) {
+            return partA.localeCompare(partB);
+        }
+    }
+    return 0;
+}
 
 function setBatchButtonsDisabled(disabled) {
     const btns = document.querySelectorAll('.batch-section .btn');
@@ -35,7 +57,9 @@ async function loadSettings() {
         const result = await apiRequest('/settings');
         if (result.success && result.settings) {
             currentDelay = result.settings.delay || 30;
+            naturalSort = result.settings.naturalSort || false;
             updateDelayDisplay();
+            updateNaturalSortDisplay();
         }
     } catch (e) {
         console.warn('加载设置失败:', e);
@@ -49,11 +73,23 @@ function updateDelayDisplay() {
     if (delayValue) delayValue.textContent = currentDelay;
 }
 
+function updateNaturalSortDisplay() {
+    const checkbox = document.getElementById('setting-natural-sort');
+    if (checkbox) checkbox.checked = naturalSort;
+}
+
+function toggleNaturalSort(enabled) {
+    naturalSort = enabled;
+    saveSettings();
+    loadServers();
+    loadVMs();
+}
+
 async function saveSettings() {
     try {
         await apiRequest('/settings', {
             method: 'POST',
-            body: JSON.stringify({ delay: currentDelay })
+            body: JSON.stringify({ delay: currentDelay, naturalSort: naturalSort })
         });
     } catch (e) {
         console.warn('保存设置失败:', e);
@@ -68,7 +104,15 @@ async function apiRequest(endpoint, options = {}) {
             },
             ...options
         });
-        return await response.json();
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            return await response.json();
+        }
+        const text = await response.text();
+        if (text.startsWith('<') && text.includes('Unexpected token')) {
+            return { success: false, error: '服务器错误，请检查网络连接' };
+        }
+        return { success: false, error: text };
     } catch (error) {
         console.error('API Error:', error);
         return { success: false, error: error.message };
@@ -169,7 +213,10 @@ async function loadServers() {
     try {
         const result = await apiRequest('/servers');
         if (result.success) {
-            servers = (result.servers || []).sort((a, b) => a.host.localeCompare(b.host));
+            const sortFunc = naturalSort
+                ? (a, b) => naturalSortCompare(a.host, b.host)
+                : (a, b) => a.host.localeCompare(b.host);
+            servers = (result.servers || []).sort(sortFunc);
         }
     } catch (e) {
         console.error('加载服务器失败:', e);
@@ -385,7 +432,10 @@ async function loadVMs() {
         const vmOverviewDiv = document.getElementById('vm-overview');
 
         if (result.success && result.vms) {
-            vmData = result.vms.sort((a, b) => a.name.localeCompare(b.name));
+            const sortFunc = naturalSort
+                ? (a, b) => naturalSortCompare(a.name, b.name)
+                : (a, b) => a.name.localeCompare(b.name);
+            vmData = result.vms.sort(sortFunc);
 
             if (vmData.length === 0) {
                 if (vmListDiv) vmListDiv.innerHTML = '<p class="text-muted">未找到虚拟机</p>';
@@ -2031,6 +2081,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                     break;
                 case 'vms':
                     loadVMs();
+                    stopLogAutoRefresh();
+                    break;
+                case 'settings':
                     stopLogAutoRefresh();
                     break;
                 case 'dashboard':

@@ -41,6 +41,7 @@
             <button class="nav-btn" data-tab="vms">🖧 虚拟机</button>
             <button class="nav-btn" data-tab="scheduler">⏰ 定时任务</button>
             <button class="nav-btn" data-tab="credentials">🔑 连接配置</button>
+            <button class="nav-btn" data-tab="settings">⚙️ 系统设置</button>
             <button class="nav-btn" data-tab="logs">📋 日志</button>
         </nav>
 
@@ -161,6 +162,27 @@
                         <button class="btn btn-secondary" onclick="clearLogs()">🗑️ 清空</button>
                     </div>
                     <pre id="log-content" class="log-content">暂无日志记录</pre>
+                </div>
+            </section>
+
+            <section id="settings" class="tab-content">
+                <div class="card">
+                    <h2>⚙️ 系统设置</h2>
+                    <div class="settings-section">
+                        <h3>🔀 排序设置</h3>
+                        <p class="settings-desc">支持名称中包含数字的自然排序（如 vm1, vm2, vm10 会按数字大小排序，而非字典序）</p>
+                        <div class="setting-item">
+                            <label>
+                                <input type="checkbox" id="setting-natural-sort" onchange="toggleNaturalSort(this.checked)">
+                                启用自然排序
+                            </label>
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <h3>ℹ️ 关于系统</h3>
+                        <p>ESXi 虚拟机管理器 v1.0</p>
+                        <p class="text-muted">基于 Flask + Vue.js 构建</p>
+                    </div>
                 </div>
             </section>
 
