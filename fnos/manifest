@@ -1,0 +1,13 @@
+display_name=ESXi虚拟机管理器
+desc=<p>基于Flask+Vue.js的ESXi虚拟机管理Web界面</p><p>支持批量操作、状态监控、快捷收藏等功能</p>
+appname=esxi-vm-manager
+version=1.0.0
+arch=x86_64
+source=thirdparty
+maintainer=Eric
+maintainer_url=https://github.com/ericyaoxr
+distributor=Eric
+distributor_url=https://github.com/ericyaoxr
+helpurl=https://github.com/ericyaoxr/esxi-vm-manager#readme
+desktop_uidir=ui
+desktop_applaunchname=esxi-vm-manager.Application

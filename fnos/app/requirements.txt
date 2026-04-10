@@ -7,4 +7,3 @@ python-dotenv==1.0.0
 Flask-WTF==1.2.1
 WTForms==3.1.1
 cryptography>=3.1
-Flask-Limiter==3.5.0

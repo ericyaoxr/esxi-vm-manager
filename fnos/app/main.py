@@ -1,5 +1,4 @@
 from app.security import encrypt_password, decrypt_password, validate_esxi_host
-from app import limiter
 import os
 import json
 import ssl
@@ -226,11 +225,6 @@ def wait_for_task(task):
 @main_bp.route('/')
 def index():
     return render_template('index.html')
-
-@main_bp.route('/health')
-@limiter.exempt
-def health():
-    return jsonify({'status': 'healthy', 'timestamp': datetime.now().isoformat()})
 
 @main_bp.route('/api/config', methods=['GET'])
 def api_get_config():

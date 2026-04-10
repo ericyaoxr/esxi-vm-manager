@@ -268,14 +268,6 @@ nav {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    min-height: 44px;
-    min-width: 44px;
-}
-
-.btn:focus {
-    outline: 2px solid var(--primary-color);
-    outline-offset: 2px;
-    box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.2);
 }
 
 .btn:hover {

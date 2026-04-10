@@ -1,0 +1,3 @@
+#!/bin/bash
+echo "Stopping ESXi VM Manager..."
+pkill -f "python -m app" || true

@@ -1,0 +1,8 @@
+#!/bin/bash
+echo "Installing ESXi VM Manager..."
+mkdir -p /app
+cp -r /tmp/esxi-vm-manager/app /app/
+cp -r /tmp/esxi-vm-manager/config /app/ 2>/dev/null || true
+mkdir -p /app/logs
+chmod -R 755 /app
+echo "Installation complete."

@@ -1,7 +1,5 @@
 import os
 from flask import Flask, jsonify, request
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
 from app.main import main_bp
 from app.security import is_ip_allowed, get_client_ip
 
@@ -11,26 +9,20 @@ try:
 except ImportError:
     pass
 
-limiter = Limiter(
-    key_func=get_remote_address,
-    default_limits=["200 per day", "50 per hour"]
-)
-
 def create_app():
     app = Flask(__name__)
     app.config['SECRET_KEY'] = os.environ.get('FLASK_SECRET_KEY') or 'esxi-vm-manager-secret-key'
     app.config['WTF_CSRF_ENABLED'] = False
     app.config['WTF_CSRF_CHECK_DEFAULT'] = False
-    app.config['BASIC_AUTH_CREDENTIALS'] = os.environ.get('BASIC_AUTH_CREDENTIALS', '')
     app.register_blueprint(main_bp)
-    limiter.init_app(app)
+
+    basic_auth_creds = os.environ.get('BASIC_AUTH_CREDENTIALS', '')
 
     @app.before_request
     def check_auth():
-        if request.endpoint == 'main.health':
+        if request.endpoint == 'main.api_health':
             return None
 
-        basic_auth_creds = app.config.get('BASIC_AUTH_CREDENTIALS', '')
         if basic_auth_creds:
             auth = request.authorization
             if not auth or auth.username + ':' + auth.password != basic_auth_creds:
@@ -72,10 +64,6 @@ def create_app():
         response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'"
         response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
         return response
-
-    @app.errorhandler(429)
-    def ratelimit_handler(e):
-        return jsonify({'success': False, 'error': '请求过于频繁，请稍后再试'}), 429
 
     from app.scheduler import init_scheduler
     init_scheduler(app)
