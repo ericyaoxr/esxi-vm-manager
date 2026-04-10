@@ -14,6 +14,9 @@ let favorites = [];
 let currentDelay = 30;
 let currentFavoriteIndex = -1;
 let isProcessing = false;
+let serverDetailCache = null;
+let serverDetailCacheTime = 0;
+const SERVER_DETAIL_CACHE_DURATION = 30000;
 
 function setBatchButtonsDisabled(disabled) {
     const btns = document.querySelectorAll('.batch-section .btn');
@@ -72,6 +75,32 @@ async function apiRequest(endpoint, options = {}) {
     }
 }
 
+let loadingCount = 0;
+let loadingTimer = null;
+function showLoading(text = '加载中...') {
+    loadingCount++;
+    if (loadingTimer) {
+        clearTimeout(loadingTimer);
+        loadingTimer = null;
+    }
+    const overlay = document.getElementById('loading-overlay');
+    const textEl = overlay?.querySelector('.loading-text');
+    if (textEl) textEl.textContent = text;
+    if (overlay && !overlay.classList.contains('active')) {
+        overlay.classList.add('active');
+    }
+}
+
+function hideLoading() {
+    if (loadingCount > 0) {
+        loadingCount--;
+    }
+    if (loadingCount === 0) {
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) overlay.classList.remove('active');
+    }
+}
+
 function showToast(message, type = 'info') {
     const toast = document.getElementById('toast');
     if (!toast) return;
@@ -104,11 +133,16 @@ async function checkConnection() {
 }
 
 async function refreshStatus() {
-    await checkConnection();
-    await loadServers();
-    await loadVMs();
-    await loadFavorites();
-    updateVMCards();
+    showLoading('正在刷新...');
+    try {
+        await checkConnection();
+        await loadServers();
+        await loadVMs();
+        await loadFavorites();
+        updateVMCards();
+    } finally {
+        setTimeout(hideLoading, 100);
+    }
 }
 
 async function loadServers() {
@@ -122,19 +156,47 @@ async function loadServers() {
     }
 }
 
-async function loadServerDetail() {
+async function loadServerDetail(forceRefresh = false) {
+    if (!forceRefresh && serverDetailCache && (Date.now() - serverDetailCacheTime) < SERVER_DETAIL_CACHE_DURATION) {
+        renderServerDetail(serverDetailCache);
+        return;
+    }
+
+    showLoading('加载服务器详情...');
     try {
         const result = await apiRequest('/servers/detail');
         const serverListDiv = document.getElementById('server-list');
         if (!serverListDiv) return;
-
-        console.log('Server detail result:', result);
 
         if (!result.success || !result.servers || result.servers.length === 0) {
             serverListDiv.innerHTML = '<p class="text-muted">暂无服务器信息</p>';
             return;
         }
 
+        serverDetailCache = result;
+        serverDetailCacheTime = Date.now();
+        renderServerDetail(result);
+    } catch (e) {
+        console.error('加载服务器详情失败:', e);
+        const serverListDiv = document.getElementById('server-list');
+        if (serverListDiv) {
+            serverListDiv.innerHTML = '<p class="text-muted">加载失败</p>';
+        }
+    } finally {
+        setTimeout(hideLoading, 100);
+    }
+}
+
+function renderServerDetail(result) {
+    const serverListDiv = document.getElementById('server-list');
+    if (!serverListDiv) return;
+
+    if (!result.success || !result.servers || result.servers.length === 0) {
+        serverListDiv.innerHTML = '<p class="text-muted">暂无服务器信息</p>';
+        return;
+    }
+
+    try {
         const serverCards = result.servers.map(server => {
             if (!server.connected) {
                 return `
@@ -207,11 +269,8 @@ async function loadServerDetail() {
 
         serverListDiv.innerHTML = `<div class="server-grid">${serverCards}</div>`;
     } catch (e) {
-        console.error('加载服务器详情失败:', e);
-        const serverListDiv = document.getElementById('server-list');
-        if (serverListDiv) {
-            serverListDiv.innerHTML = '<p class="text-muted">加载失败</p>';
-        }
+        console.error('渲染服务器详情失败:', e);
+        serverListDiv.innerHTML = '<p class="text-muted">渲染失败</p>';
     }
 }
 
@@ -366,22 +425,26 @@ function createVMCard(vm) {
         'poweredOff': '已停止',
         'suspended': '已挂起'
     }[vm.state] || '未知';
+    const safeName = escapeHtml(vm.name);
+    const safeServer = escapeHtml(vm.server || vm.server_host);
+    const safeServerHost = escapeHtml(vm.server_host);
 
     return `
-        <div class="vm-card ${isSelected ? 'selected' : ''} ${isPoweredOff ? 'vm-powered-off' : ''}" data-vm-name="${vm.name}" data-server-host="${vm.server_host}">
-            <div class="vm-card-header" onclick="handleVMCardClick(event, '${vm.name}', '${vm.server_host}')">
-                <input type="checkbox" class="vm-checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); toggleVMSelection('${vm.name}', '${vm.server_host}')">
-                <span class="vm-name" title="${vm.server || ''}">${vm.name}</span>
+        <div class="vm-card ${isSelected ? 'selected' : ''} ${isPoweredOff ? 'vm-powered-off' : ''}" data-vm-name="${safeName}" data-server-host="${safeServerHost}">
+            <div class="vm-card-header" onclick="handleVMCardClick(event, '${safeName}', '${safeServerHost}')">
+                <input type="checkbox" class="vm-checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); toggleVMSelection('${safeName}', '${safeServerHost}')">
+                <span class="vm-name" title="${safeServer}">${safeName}</span>
                 <span class="vm-state ${stateClass}">${stateText}</span>
             </div>
             <div class="vm-card-body">
-                <p>服务器: ${vm.server || vm.server_host}</p>
+                <p>服务器: ${safeServer}</p>
                 <p>状态: ${stateText}</p>
                 <p>CPU: ${vm.cpu || 0} 核 | 内存: ${vm.memory || 0} GB</p>
             </div>
-            <div class="vm-card-footer btn-group" data-vm-name="${vm.name}" data-server-host="${vm.server_host}">
-                ${canSuspend ? `<button class="btn btn-warning btn-sm" onclick="suspendVM('${vm.name}', '${vm.server_host}', event)">挂起</button>` : ''}
-                ${canStart ? `<button class="btn btn-success btn-sm" onclick="startVM('${vm.name}', '${vm.server_host}', event)">启动</button>` : ''}
+            <div class="vm-card-footer btn-group" data-vm-name="${safeName}" data-server-host="${safeServerHost}">
+                <button class="btn btn-info btn-sm" onclick="openVmDetail('${safeName}', '${safeServerHost}', event)">详情</button>
+                ${canSuspend ? `<button class="btn btn-warning btn-sm" onclick="suspendVM('${safeName}', '${safeServerHost}', event)">挂起</button>` : ''}
+                ${canStart ? `<button class="btn btn-success btn-sm" onclick="startVM('${safeName}', '${safeServerHost}', event)">启动</button>` : ''}
                 <button class="btn btn-secondary btn-sm" onclick="refreshStatus()">刷新</button>
             </div>
         </div>
@@ -474,10 +537,12 @@ function updateSelectedVMPreview() {
 
     const selectedList = getSelectedVMList();
     const vmItems = selectedList.map(vm => {
+        const safeName = escapeHtml(vm.name);
+        const safeServer = escapeHtml(vm.server || vm.server_host);
         return `
             <div class="selected-vm-item">
-                <span class="selected-vm-name">${vm.name}</span>
-                <span class="selected-vm-server">${vm.server || vm.server_host}</span>
+                <span class="selected-vm-name">${safeName}</span>
+                <span class="selected-vm-server">${safeServer}</span>
             </div>
         `;
     }).join('');
@@ -880,17 +945,33 @@ function renderFavorites() {
 
     const favCards = favorites.map((fav, index) => {
         const isActive = index === currentFavoriteIndex;
+        const safeName = escapeHtml(fav.name);
         return `
-        <div class="favorite-item ${isActive ? 'active' : ''}" data-index="${index}" onclick="loadFavoriteToSelection(${index})">
+        <div class="favorite-item ${isActive ? 'active' : ''}" data-index="${index}" onclick="toggleFavoriteSelection(${index})">
             <div class="favorite-info">
-                <span class="favorite-name">${fav.name}</span>
+                <span class="favorite-name">${safeName}</span>
                 <span class="favorite-count">${fav.vms.length}台</span>
             </div>
-            <button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); deleteFavorite(${index})">删除</button>
+            <div class="favorite-actions">
+                <button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); deleteFavorite(${index})">删除</button>
+            </div>
         </div>
     `}).join('');
 
     quickDiv.innerHTML = `<div class="favorites-grid">${favCards}</div>`;
+}
+
+function toggleFavoriteSelection(index) {
+    if (currentFavoriteIndex === index) {
+        currentFavoriteIndex = -1;
+        selectedVMs.clear();
+        updateVMCards();
+        renderFavorites();
+        showToast('已取消选择', 'info');
+    } else {
+        currentFavoriteIndex = index;
+        loadFavoriteToSelection(index);
+    }
 }
 
 function loadFavoriteToSelection(index) {
@@ -1030,6 +1111,7 @@ async function confirmSaveFavorite() {
 }
 
 async function loadCredentials() {
+    showLoading('加载凭据...');
     try {
         const result = await apiRequest('/servers');
         if (result.success) {
@@ -1038,6 +1120,8 @@ async function loadCredentials() {
         }
     } catch (e) {
         console.error('加载服务器配置失败:', e);
+    } finally {
+        setTimeout(hideLoading, 100);
     }
 }
 
@@ -1053,8 +1137,8 @@ function renderCredentialsList() {
     const serverCards = servers.map((server, index) => `
         <div class="credential-card">
             <div class="credential-info">
-                <strong>${escapeHtml(server.name) || server.host}</strong>
-                <span>${server.host}</span>
+                <strong>${escapeHtml(server.name) || escapeHtml(server.host)}</strong>
+                <span>${escapeHtml(server.host)}</span>
             </div>
             <button class="btn btn-danger btn-sm" onclick="deleteServer(${index})">删除</button>
         </div>
@@ -1202,9 +1286,11 @@ function initSchedulerForm() {
         vmSelector.innerHTML = '<span class="text-muted">请先在控制台加载虚拟机</span>';
         return;
     }
-    vmSelector.innerHTML = vmData.map(vm => `
-        <span class="task-vm-item" data-vm="${vm.name}|${vm.server_host}" onclick="toggleTaskVM(this)">${vm.name}</span>
-    `).join('');
+    vmSelector.innerHTML = vmData.map(vm => {
+        const safeName = escapeHtml(vm.name);
+        const safeKey = escapeHtml(vm.name + '|' + vm.server_host);
+        return `<span class="task-vm-item" data-vm="${safeKey}" onclick="toggleTaskVM(this)">${safeName}</span>`;
+    }).join('');
 }
 
 function toggleTaskVM(el) {
@@ -1238,14 +1324,8 @@ async function createTask() {
             const [n, server_host] = key.split('|');
             return { name: n, server_host };
         }),
-        enabled: true,
-        notify_enabled: document.getElementById('new-task-notify').checked
+        enabled: true
     };
-
-    if (task.notify_enabled) {
-        const webhookUrl = document.getElementById('new-task-wechat-url').value.trim();
-        if (webhookUrl) task.wechat = { enabled: true, webhook_url: webhookUrl };
-    }
 
     try {
         const result = await apiRequest('/scheduler/tasks', { method: 'POST', body: JSON.stringify(task) });
@@ -1266,9 +1346,6 @@ function resetTaskForm() {
     document.getElementById('new-task-name').value = '';
     document.getElementById('new-task-action').value = 'start';
     document.getElementById('new-task-time').value = '09:00';
-    document.getElementById('new-task-notify').checked = false;
-    document.getElementById('new-task-wechat-url').value = '';
-    document.getElementById('new-task-wechat-config').style.display = 'none';
     document.querySelectorAll('input[name="new-task-days"]').forEach((cb, i) => cb.checked = i < 5);
     selectedTaskVMs.clear();
     document.querySelectorAll('.task-vm-item').forEach(el => el.classList.remove('selected'));
@@ -1283,7 +1360,6 @@ let editingTaskId = null;
 async function openEditTaskModal(taskId) {
     try {
         const result = await apiRequest('/scheduler/tasks');
-        console.log('Edit task result:', result);
         if (!result) {
             showToast('加载任务信息失败: 无响应', 'error');
             return;
@@ -1307,11 +1383,6 @@ async function openEditTaskModal(taskId) {
         document.getElementById('new-task-name').value = task.name || '';
         document.getElementById('new-task-action').value = task.action || 'start';
         document.getElementById('new-task-time').value = `${String(task.cron?.hour || 0).padStart(2, '0')}:${String(task.cron?.minute || 0).padStart(2, '0')}`;
-        document.getElementById('new-task-notify').checked = task.notify_enabled || false;
-        if (task.wechat?.webhook_url) {
-            document.getElementById('new-task-wechat-url').value = task.wechat.webhook_url;
-            document.getElementById('new-task-wechat-config').style.display = 'block';
-        }
 
         const days = (task.cron?.day_of_week || '').split(',').filter(d => d);
         document.querySelectorAll('input[name="new-task-days"]').forEach(cb => {
@@ -1369,14 +1440,8 @@ async function updateTask() {
             const [n, server_host] = key.split('|');
             return { name: n, server_host };
         }),
-        enabled: true,
-        notify_enabled: document.getElementById('new-task-notify').checked
+        enabled: true
     };
-
-    if (task.notify_enabled) {
-        const webhookUrl = document.getElementById('new-task-wechat-url').value.trim();
-        if (webhookUrl) task.wechat = { enabled: true, webhook_url: webhookUrl };
-    }
 
     try {
         const result = await apiRequest('/scheduler/tasks', { method: 'POST', body: JSON.stringify(task) });
@@ -1395,6 +1460,7 @@ async function updateTask() {
 }
 
 async function loadTasks() {
+    showLoading('加载定时任务...');
     try {
         const result = await apiRequest('/scheduler/tasks');
         const tasksList = document.getElementById('tasks-list');
@@ -1416,10 +1482,11 @@ async function loadTasks() {
                     <div class="task-list-item ${task.enabled ? '' : 'disabled'}">
                         <div class="task-info">
                             <div class="task-title">${actionIcons[task.action]} ${task.name}</div>
-                            <div class="task-meta">⏰ ${time} | ${dayStr} | ${vmNames} ${task.notify_enabled ? '| 🔔' : ''}</div>
+                            <div class="task-meta">⏰ ${time} | ${dayStr} | ${vmNames}</div>
                         </div>
                         <div class="task-controls">
                             <button class="btn btn-sm btn-warning" onclick="openEditTaskModal('${task.id}')">✏️</button>
+                            <button class="btn btn-sm btn-info" onclick="openWebhookModal()">🔔</button>
                             ${task.enabled
                                 ? `<button class="btn btn-sm btn-secondary" onclick="toggleTask('${task.id}', false)">⏸</button>`
                                 : `<button class="btn btn-sm btn-success" onclick="toggleTask('${task.id}', true)">▶</button>`
@@ -1434,6 +1501,8 @@ async function loadTasks() {
         }
     } catch (e) {
         console.error('加载任务失败:', e);
+    } finally {
+        setTimeout(hideLoading, 100);
     }
 }
 
@@ -1478,6 +1547,336 @@ async function removeTask(taskId) {
         }
     } catch (e) {
         showToast('删除失败', 'error');
+    }
+}
+
+let currentVmDetail = null;
+
+async function openVmDetail(vmName, serverHost, event) {
+    if (event && event.stopPropagation) event.stopPropagation();
+
+    const modal = document.getElementById('vm-detail-modal');
+    const content = document.getElementById('vm-detail-content');
+    const title = document.getElementById('vm-detail-title');
+
+    if (!modal || !content) return;
+
+    title.textContent = `🖥️ ${vmName}`;
+    content.innerHTML = '<div class="vm-detail-loading">加载中...</div>';
+    modal.style.display = 'flex';
+
+    try {
+        const result = await apiRequest(`/vm/${encodeURIComponent(vmName)}/detail?server_host=${encodeURIComponent(serverHost)}`);
+
+        if (result.success && result.vm) {
+            currentVmDetail = result.vm;
+            renderVmDetail(result.vm);
+        } else {
+            content.innerHTML = `<div class="vm-detail-loading">加载失败: ${result.error || '未知错误'}</div>`;
+        }
+    } catch (e) {
+        content.innerHTML = `<div class="vm-detail-loading">加载失败: ${e.message}</div>`;
+    }
+}
+
+function renderVmDetail(vm) {
+    const content = document.getElementById('vm-detail-content');
+    if (!content) return;
+
+    const stateClass = {
+        'poweredOn': 'status-on',
+        'poweredOff': 'status-off',
+        'suspended': 'status-suspended'
+    }[vm.state] || '';
+
+    const stateText = {
+        'poweredOn': '运行中',
+        'poweredOff': '已停止',
+        'suspended': '已挂起'
+    }[vm.state] || vm.state;
+
+    const uptime = formatUptime(vm.uptime_seconds);
+
+    const guestInfo = vm.guest || {};
+    const snapshotList = vm.snapshots?.snapshots || [];
+    const networkList = vm.network || [];
+    const diskList = vm.disks || [];
+
+    content.innerHTML = `
+        <div class="vm-detail-section">
+            <h4>📋 基本信息</h4>
+            <div class="vm-detail-grid">
+                <div class="vm-detail-item">
+                    <span class="label">状态</span>
+                    <span class="value ${stateClass}">${stateText}</span>
+                </div>
+                <div class="vm-detail-item">
+                    <span class="label">服务器</span>
+                    <span class="value">${escapeHtml(vm.server || vm.server_host)}</span>
+                </div>
+                <div class="vm-detail-item">
+                    <span class="label">CPU</span>
+                    <span class="value">${vm.cpu?.count || 0} 核 ${vm.cpu?.threads ? `(${vm.cpu.threads} 线程)` : ''}</span>
+                </div>
+                <div class="vm-detail-item">
+                    <span class="label">内存</span>
+                    <span class="value">${vm.memory?.total_gb || 0} GB</span>
+                </div>
+                <div class="vm-detail-item">
+                    <span class="label">UUID</span>
+                    <span class="value" style="font-size: 0.8rem; word-break: break-all;">${vm.uuid || 'N/A'}</span>
+                </div>
+                <div class="vm-detail-item">
+                    <span class="label">运行时间</span>
+                    <span class="value">${uptime}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="vm-detail-section">
+            <h4>💻 客户机信息</h4>
+            <div class="vm-detail-grid">
+                <div class="vm-detail-item">
+                    <span class="label">IP地址</span>
+                    <span class="value">${guestInfo.ip_address || 'N/A'}</span>
+                </div>
+                <div class="vm-detail-item">
+                    <span class="label">主机名</span>
+                    <span class="value">${guestInfo.hostname || 'N/A'}</span>
+                </div>
+                <div class="vm-detail-item">
+                    <span class="label">操作系统</span>
+                    <span class="value">${guestInfo.os_type || 'N/A'}</span>
+                </div>
+                <div class="vm-detail-item">
+                    <span class="label">VMware Tools</span>
+                    <span class="value">${guestInfo.tools_status || 'N/A'}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="vm-detail-section">
+            <h4>🔗 网络适配器</h4>
+            ${networkList.length > 0 ? networkList.map(nic => `
+                <div class="vm-detail-item" style="margin-bottom: 8px;">
+                    <span class="label">${escapeHtml(nic.name)}</span>
+                    <span class="value">MAC: ${nic.mac || 'N/A'} | ${nic.connected ? '已连接' : '未连接'}</span>
+                </div>
+            `).join('') : '<p class="text-muted">无网络适配器</p>'}
+        </div>
+
+        <div class="vm-detail-section">
+            <h4>💾 磁盘</h4>
+            ${diskList.length > 0 ? diskList.map(disk => `
+                <div class="vm-detail-item" style="margin-bottom: 8px;">
+                    <span class="label">${escapeHtml(disk.name)}</span>
+                    <span class="value">${disk.capacity_gb || 0} GB | ${disk.type || 'Unknown'}</span>
+                </div>
+            `).join('') : '<p class="text-muted">无磁盘信息</p>'}
+        </div>
+
+        <div class="vm-detail-section">
+            <h4>📸 快照 (${vm.snapshots?.count || 0})</h4>
+            ${snapshotList.length > 0 ? `
+                <div class="snapshot-list">
+                    ${snapshotList.map(snap => `
+                        <div class="snapshot-item">
+                            <div class="name">${escapeHtml(snap.name)}</div>
+                            <div class="info">${snap.creation_time || ''} | ${snap.state || ''}</div>
+                            ${snap.description ? `<div class="info">${escapeHtml(snap.description)}</div>` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+            ` : '<p class="text-muted">无快照</p>'}
+        </div>
+
+        <div class="vm-detail-section">
+            <h4>📝 其他</h4>
+            <div class="vm-detail-grid">
+                <div class="vm-detail-item">
+                    <span class="label">VM路径</span>
+                    <span class="value" style="font-size: 0.85rem; word-break: break-all;">${vm.vm_path || 'N/A'}</span>
+                </div>
+                ${vm.annotation ? `
+                <div class="vm-detail-item" style="grid-column: span 2;">
+                    <span class="label">备注</span>
+                    <span class="value">${escapeHtml(vm.annotation)}</span>
+                </div>
+                ` : ''}
+            </div>
+        </div>
+    `;
+}
+
+function formatUptime(seconds) {
+    if (!seconds || seconds <= 0) return 'N/A';
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    if (days > 0) return `${days}天 ${hours}小时 ${minutes}分钟`;
+    if (hours > 0) return `${hours}小时 ${minutes}分钟`;
+    return `${minutes}分钟`;
+}
+
+function closeVmDetailModal() {
+    const modal = document.getElementById('vm-detail-modal');
+    if (modal) modal.style.display = 'none';
+    currentVmDetail = null;
+}
+
+function refreshVmDetail() {
+    if (currentVmDetail) {
+        openVmDetail(currentVmDetail.name, currentVmDetail.server_host, null);
+    }
+}
+
+async function openVmPerformance(vmName, serverHost, event) {
+    if (event && event.stopPropagation) event.stopPropagation();
+
+    const modal = document.getElementById('vm-performance-modal');
+    const title = document.getElementById('vm-performance-title');
+
+    if (!modal) return;
+
+    title.textContent = `📊 ${vmName} 性能监控`;
+    modal.style.display = 'flex';
+
+    document.getElementById('perf-cpu').textContent = '--';
+    document.getElementById('perf-memory').textContent = '--';
+    document.getElementById('perf-network').textContent = '--';
+    document.getElementById('perf-cpu-bar').style.width = '0%';
+    document.getElementById('perf-memory-bar').style.width = '0%';
+    document.getElementById('performance-chart').innerHTML = '<div class="chart-placeholder">加载中...</div>';
+
+    try {
+        const result = await apiRequest(`/vm/${encodeURIComponent(vmName)}/performance?server_host=${encodeURIComponent(serverHost)}`);
+
+        if (result.success) {
+            const realtime = result.realtime || {};
+            document.getElementById('perf-cpu').textContent = (realtime.cpu_percent || 0) + '%';
+            document.getElementById('perf-memory').textContent = (realtime.memory_percent || 0) + '%';
+            document.getElementById('perf-network').textContent = (realtime.network_kbps || 0) + ' KB/s';
+
+            document.getElementById('perf-cpu-bar').style.width = (realtime.cpu_percent || 0) + '%';
+            document.getElementById('perf-memory-bar').style.width = (realtime.memory_percent || 0) + '%';
+
+            renderPerformanceChart(result.history || {});
+        } else {
+            document.getElementById('performance-chart').innerHTML = `<div class="chart-placeholder">加载失败: ${result.error || '未知错误'}</div>`;
+        }
+    } catch (e) {
+        document.getElementById('performance-chart').innerHTML = `<div class="chart-placeholder">加载失败: ${e.message}</div>`;
+    }
+}
+
+function renderPerformanceChart(history) {
+    const chartDiv = document.getElementById('performance-chart');
+    if (!chartDiv) return;
+
+    const hasData = Object.keys(history).some(key => history[key] && history[key].length > 0);
+
+    if (!hasData) {
+        chartDiv.innerHTML = '<div class="chart-placeholder">暂无历史数据<br><small>性能历史数据需要ESXi开启性能监控</small></div>';
+        return;
+    }
+
+    chartDiv.innerHTML = `
+        <div style="text-align: center; padding: 20px;">
+            <p style="color: var(--text-muted);">历史性能数据图表</p>
+            <p style="color: var(--text-muted); font-size: 0.85rem;">CPU: ${history['cpu.usage.average']?.length || 0} 条记录</p>
+            <p style="color: var(--text-muted); font-size: 0.85rem;">内存: ${history['mem.usage.average']?.length || 0} 条记录</p>
+        </div>
+    `;
+}
+
+function closeVmPerformanceModal() {
+    const modal = document.getElementById('vm-performance-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+function refreshVmPerformance() {
+    if (currentVmDetail) {
+        openVmPerformance(currentVmDetail.name, currentVmDetail.server_host, null);
+    }
+}
+
+function openVmPerformanceFromDetail() {
+    if (currentVmDetail) {
+        const vmName = currentVmDetail.name;
+        const serverHost = currentVmDetail.server_host;
+        closeVmDetailModal();
+        openVmPerformance(vmName, serverHost, null);
+    }
+}
+
+function openWebhookModal(taskId) {
+    const modal = document.getElementById('webhook-modal');
+    if (!modal) return;
+
+    const settings = window.appSettings || {};
+    const notification = settings.notification || {};
+
+    document.getElementById('notification-enable').checked = notification.enabled || false;
+    document.getElementById('wechat-enable').checked = notification.wechat_enabled || false;
+    document.getElementById('wechat-url').value = notification.wechat_url || '';
+    document.getElementById('dingtalk-enable').checked = notification.dingtalk_enabled || false;
+    document.getElementById('dingtalk-url').value = notification.dingtalk_url || '';
+    document.getElementById('feishu-enable').checked = notification.feishu_enabled || false;
+    document.getElementById('feishu-url').value = notification.feishu_url || '';
+    document.getElementById('slack-enable').checked = notification.slack_enabled || false;
+    document.getElementById('slack-url').value = notification.slack_url || '';
+    document.getElementById('telegram-enable').checked = notification.telegram_enabled || false;
+    document.getElementById('telegram-bot-token').value = notification.telegram_bot_token || '';
+    document.getElementById('telegram-chat-id').value = notification.telegram_chat_id || '';
+
+    toggleNotificationChannels(notification.enabled || false);
+
+    modal.style.display = 'flex';
+}
+
+function closeWebhookModal() {
+    const modal = document.getElementById('webhook-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+async function saveWebhookConfig() {
+    const notification = {
+        enabled: document.getElementById('notification-enable').checked,
+        wechat_enabled: document.getElementById('wechat-enable').checked,
+        wechat_url: document.getElementById('wechat-url').value.trim(),
+        dingtalk_enabled: document.getElementById('dingtalk-enable').checked,
+        dingtalk_url: document.getElementById('dingtalk-url').value.trim(),
+        feishu_enabled: document.getElementById('feishu-enable').checked,
+        feishu_url: document.getElementById('feishu-url').value.trim(),
+        slack_enabled: document.getElementById('slack-enable').checked,
+        slack_url: document.getElementById('slack-url').value.trim(),
+        telegram_enabled: document.getElementById('telegram-enable').checked,
+        telegram_bot_token: document.getElementById('telegram-bot-token').value.trim(),
+        telegram_chat_id: document.getElementById('telegram-chat-id').value.trim()
+    };
+
+    try {
+        const result = await apiRequest('/settings', {
+            method: 'POST',
+            body: JSON.stringify({ notification: notification })
+        });
+
+        if (result.success) {
+            showToast('通知设置已保存', 'success');
+            closeWebhookModal();
+        } else {
+            showToast('保存失败', 'error');
+        }
+    } catch (e) {
+        showToast('保存失败: ' + e.message, 'error');
+    }
+}
+
+function toggleNotificationChannels(enabled) {
+    const channelsDiv = document.getElementById('notification-channels');
+    if (channelsDiv) {
+        channelsDiv.style.opacity = enabled ? '1' : '0.5';
+        channelsDiv.style.pointerEvents = enabled ? 'auto' : 'none';
     }
 }
 
@@ -1556,10 +1955,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     break;
             }
         }
-    });
-
-    document.getElementById('new-task-notify')?.addEventListener('change', function() {
-        document.getElementById('new-task-wechat-config').style.display = this.checked ? 'block' : 'none';
     });
 
     await loadSettings();

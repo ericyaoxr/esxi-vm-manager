@@ -1,5 +1,6 @@
 import os
 from flask import Flask, jsonify, request
+from flask_wtf.csrf import CSRFProtect
 from app.main import main_bp
 from app.security import is_ip_allowed, get_client_ip
 
@@ -12,6 +13,9 @@ except ImportError:
 def create_app():
     app = Flask(__name__)
     app.config['SECRET_KEY'] = os.environ.get('FLASK_SECRET_KEY') or 'esxi-vm-manager-secret-key'
+    app.config['WTF_CSRF_ENABLED'] = True
+    app.config['WTF_CSRF_CHECK_DEFAULT'] = False
+    CSRFProtect(app)
     app.register_blueprint(main_bp)
 
     basic_auth_creds = os.environ.get('BASIC_AUTH_CREDENTIALS', '')
@@ -41,6 +45,27 @@ def create_app():
             app.config['APP_CONFIG'] = get_config()
         except:
             app.config['APP_CONFIG'] = {}
+
+    @app.errorhandler(404)
+    def not_found(e):
+        if request.path.startswith('/api/'):
+            return jsonify({'success': False, 'error': 'API not found'}), 404
+        return jsonify({'success': False, 'error': str(e)}), 404
+
+    @app.errorhandler(500)
+    def internal_error(e):
+        if request.path.startswith('/api/'):
+            return jsonify({'success': False, 'error': 'Internal server error'}), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.after_request
+    def add_security_headers(response):
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+        response.headers['X-XSS-Protection'] = '1; mode=block'
+        response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'"
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+        return response
 
     from app.scheduler import init_scheduler
     init_scheduler(app)

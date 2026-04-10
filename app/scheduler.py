@@ -194,40 +194,98 @@ def execute_task(task):
     return results
 
 def notify_result(task, results):
-    if not task.get('notify_enabled'):
+    global_config = get_config()
+    notification_settings = global_config.get('notification', {})
+    if not notification_settings.get('enabled'):
         return
 
-    wechat_config = task.get('wechat', {})
-    if not wechat_config.get('enabled'):
-        return
-
-    msg = f"任务通知: {task['name']}\n"
-    msg += f"执行时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-    msg += f"执行结果: 成功 {results['success']} | 失败 {results['failed']}\n"
+    msg = f"📋 任务通知: {task['name']}\n"
+    msg += f"⏰ 执行时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+    msg += f"✅ 执行结果: 成功 {results['success']} | ❌ 失败 {results['failed']}\n"
     if results['details']:
-        msg += f"详情:\n" + "\n".join(results['details'])
+        msg += f"📝 详情:\n" + "\n".join(results['details'])
 
-    send_wechat_message(wechat_config, msg)
+    if notification_settings.get('wechat_enabled') and notification_settings.get('wechat_url'):
+        send_wechat_message(notification_settings['wechat_url'], msg)
 
-def send_wechat_message(config, message):
+    if notification_settings.get('dingtalk_enabled') and notification_settings.get('dingtalk_url'):
+        send_dingtalk_message(notification_settings['dingtalk_url'], msg)
+
+    if notification_settings.get('feishu_enabled') and notification_settings.get('feishu_url'):
+        send_feishu_message(notification_settings['feishu_url'], msg)
+
+    if notification_settings.get('slack_enabled') and notification_settings.get('slack_url'):
+        send_slack_message(notification_settings['slack_url'], msg)
+
+    if notification_settings.get('telegram_enabled') and notification_settings.get('telegram_bot_token') and notification_settings.get('telegram_chat_id'):
+        send_telegram_message(notification_settings['telegram_bot_token'], notification_settings['telegram_chat_id'], msg)
+
+def send_wechat_message(webhook_url, message):
     try:
         import requests
-        webhook_url = config.get('webhook_url', '')
-        if not webhook_url:
-            logger.warn("WeChat webhook URL not configured")
-            return
-
         payload = {
             "msgtype": "text",
             "text": {
                 "content": message
             }
         }
-
         resp = requests.post(webhook_url, json=payload, timeout=10)
         logger.info(f"WeChat notification sent: {resp.status_code}")
     except Exception as e:
         logger.error(f"Failed to send WeChat notification: {e}")
+
+def send_dingtalk_message(webhook_url, message):
+    try:
+        import requests
+        payload = {
+            "msgtype": "text",
+            "text": {
+                "content": message
+            }
+        }
+        resp = requests.post(webhook_url, json=payload, timeout=10)
+        logger.info(f"DingTalk notification sent: {resp.status_code}")
+    except Exception as e:
+        logger.error(f"Failed to send DingTalk notification: {e}")
+
+def send_feishu_message(webhook_url, message):
+    try:
+        import requests
+        payload = {
+            "msg_type": "text",
+            "content": {
+                "text": message
+            }
+        }
+        resp = requests.post(webhook_url, json=payload, timeout=10)
+        logger.info(f"Feishu notification sent: {resp.status_code}")
+    except Exception as e:
+        logger.error(f"Failed to send Feishu notification: {e}")
+
+def send_slack_message(webhook_url, message):
+    try:
+        import requests
+        payload = {
+            "text": message
+        }
+        resp = requests.post(webhook_url, json=payload, timeout=10)
+        logger.info(f"Slack notification sent: {resp.status_code}")
+    except Exception as e:
+        logger.error(f"Failed to send Slack notification: {e}")
+
+def send_telegram_message(bot_token, chat_id, message):
+    try:
+        import requests
+        url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+        payload = {
+            "chat_id": chat_id,
+            "text": message,
+            "parse_mode": "HTML"
+        }
+        resp = requests.post(url, json=payload, timeout=10)
+        logger.info(f"Telegram notification sent: {resp.status_code}")
+    except Exception as e:
+        logger.error(f"Failed to send Telegram notification: {e}")
 
 def get_scheduler():
     return _scheduler

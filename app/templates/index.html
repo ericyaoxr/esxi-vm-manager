@@ -3,11 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="description" content="ESXi虚拟机管理器">
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
     <title>ESXi 虚拟机管理器</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🖥️</text></svg>">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🖥️</text></svg>">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
+    <div id="loading-overlay" class="loading-overlay active">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">正在连接服务器...</div>
+    </div>
     <div class="container">
         <header>
             <div class="logo">
@@ -28,12 +36,12 @@
         </header>
 
         <nav>
-            <button class="nav-btn active" data-tab="dashboard">控制台</button>
-            <button class="nav-btn" data-tab="servers">服务器</button>
-            <button class="nav-btn" data-tab="vms">虚拟机</button>
+            <button class="nav-btn active" data-tab="dashboard">🏠 控制台</button>
+            <button class="nav-btn" data-tab="servers">🖥️ 服务器</button>
+            <button class="nav-btn" data-tab="vms">🖧 虚拟机</button>
             <button class="nav-btn" data-tab="scheduler">⏰ 定时任务</button>
-            <button class="nav-btn" data-tab="credentials">连接配置</button>
-            <button class="nav-btn" data-tab="logs">日志</button>
+            <button class="nav-btn" data-tab="credentials">🔑 连接配置</button>
+            <button class="nav-btn" data-tab="logs">📋 日志</button>
         </nav>
 
         <main>
@@ -200,13 +208,6 @@
                             <label>选择虚拟机</label>
                             <div id="new-task-vms" class="task-vm-selector"></div>
                         </div>
-                        <div class="form-group">
-                            <label><input type="checkbox" id="new-task-notify"> 启用微信通知</label>
-                        </div>
-                        <div id="new-task-wechat-config" class="form-group" style="display:none;">
-                            <label>企业微信 Webhook URL</label>
-                            <input type="text" id="new-task-wechat-url" placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx">
-                        </div>
                         <div class="form-actions">
                             <button class="btn btn-primary" id="new-task-submit-btn" onclick="createTask()">创建任务</button>
                             <button class="btn btn-secondary" id="new-task-cancel-btn" onclick="cancelEditTask()" style="display:none;">取消</button>
@@ -272,8 +273,127 @@
         </div>
     </div>
 
-    <div id="toast" class="toast"></div>
+    <div id="vm-detail-modal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3 id="vm-detail-title">🖥️ 虚拟机详情</h3>
+                <button class="modal-close" onclick="closeVmDetailModal()">×</button>
+            </div>
+            <div id="vm-detail-content" class="vm-detail-content">
+                <div class="vm-detail-loading">加载中...</div>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn btn-secondary" onclick="refreshVmDetail()">🔄 刷新</button>
+                <button class="btn btn-info" onclick="openVmPerformanceFromDetail()">📊 性能</button>
+                <button class="btn btn-secondary" onclick="closeVmDetailModal()">关闭</button>
+            </div>
+        </div>
+    </div>
 
+    <div id="vm-performance-modal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3 id="vm-performance-title">📊 性能监控</h3>
+                <button class="modal-close" onclick="closeVmPerformanceModal()">×</button>
+            </div>
+            <div id="vm-performance-content" class="vm-performance-content">
+                <div class="performance-stats">
+                    <div class="stat-card">
+                        <div class="stat-label">CPU 使用率</div>
+                        <div class="stat-value" id="perf-cpu">--</div>
+                        <div class="stat-bar"><div class="stat-bar-fill" id="perf-cpu-bar" style="width: 0%"></div></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">内存使用率</div>
+                        <div class="stat-value" id="perf-memory">--</div>
+                        <div class="stat-bar"><div class="stat-bar-fill" id="perf-memory-bar" style="width: 0%"></div></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">网络流量</div>
+                        <div class="stat-value" id="perf-network">--</div>
+                    </div>
+                </div>
+                <div class="performance-chart" id="performance-chart">
+                    <div class="chart-placeholder">性能图表加载中...</div>
+                </div>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn btn-secondary" onclick="refreshVmPerformance()">🔄 刷新</button>
+                <button class="btn btn-secondary" onclick="closeVmPerformanceModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="webhook-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🔔 通知设置</h3>
+                <button class="modal-close" onclick="closeWebhookModal()">×</button>
+            </div>
+            <div class="webhook-channels">
+                <div class="webhook-channel" style="border-bottom: 2px solid var(--border-color); padding-bottom: 12px; margin-bottom: 12px;">
+                    <label class="channel-toggle" style="font-weight: bold;">
+                        <input type="checkbox" id="notification-enable" onchange="toggleNotificationChannels(this.checked)">
+                        <span>启用通知</span>
+                    </label>
+                </div>
+                <div id="notification-channels" style="opacity: 0.5; pointer-events: none;">
+                <div class="webhook-channel">
+                    <label class="channel-toggle">
+                        <input type="checkbox" id="wechat-enable">
+                        <span>企业微信</span>
+                    </label>
+                    <input type="text" id="wechat-url" class="form-control" placeholder="企业微信 Webhook URL">
+                </div>
+                <div class="webhook-channel">
+                    <label class="channel-toggle">
+                        <input type="checkbox" id="dingtalk-enable">
+                        <span>钉钉</span>
+                    </label>
+                    <input type="text" id="dingtalk-url" class="form-control" placeholder="钉钉 Webhook URL">
+                </div>
+                <div class="webhook-channel">
+                    <label class="channel-toggle">
+                        <input type="checkbox" id="feishu-enable">
+                        <span>飞书</span>
+                    </label>
+                    <input type="text" id="feishu-url" class="form-control" placeholder="飞书 Webhook URL">
+                </div>
+                <div class="webhook-channel">
+                    <label class="channel-toggle">
+                        <input type="checkbox" id="slack-enable">
+                        <span>Slack</span>
+                    </label>
+                    <input type="text" id="slack-url" class="form-control" placeholder="Slack Webhook URL">
+                </div>
+                <div class="webhook-channel">
+                    <label class="channel-toggle">
+                        <input type="checkbox" id="telegram-enable">
+                        <span>Telegram</span>
+                    </label>
+                    <div class="telegram-config">
+                        <input type="text" id="telegram-bot-token" class="form-control" placeholder="Bot Token">
+                        <input type="text" id="telegram-chat-id" class="form-control" placeholder="Chat ID">
+                    </div>
+                </div>
+                </div>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn btn-primary" onclick="saveWebhookConfig()">保存</button>
+                <button class="btn btn-secondary" onclick="closeWebhookModal()">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+    <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/static/service-worker.js')
+                .then(reg => console.log('SW registered'))
+                .catch(err => console.log('SW registration failed:', err));
+        }
+    </script>
 </body>
 </html>

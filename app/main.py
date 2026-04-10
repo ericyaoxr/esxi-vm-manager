@@ -1,8 +1,9 @@
+from app.security import encrypt_password, decrypt_password, validate_esxi_host
 import os
 import json
 import ssl
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import Blueprint, render_template, jsonify, request
 
 from pyVim import connect
@@ -61,6 +62,9 @@ def save_servers(servers):
     try:
         servers_dir = os.path.dirname(Config.SERVERS_PATH)
         os.makedirs(servers_dir, exist_ok=True)
+        for server in servers:
+            if server.get('password'):
+                server['password'] = encrypt_password(server['password'])
         with open(Config.SERVERS_PATH, 'w') as f:
             json.dump(servers, f, indent=2)
         return True
@@ -103,10 +107,11 @@ def connect_to_vsphere(server=None):
 
     try:
         context = get_ssl_context()
+        password = decrypt_password(creds.get('password', ''))
         service_instance = connect.SmartConnect(
             host=creds['host'],
             user=creds['username'],
-            pwd=creds['password'],
+            pwd=password,
             sslContext=context
         )
         return service_instance, None
@@ -256,6 +261,9 @@ def api_check_server():
     data = request.json
     server = data.get('server', {})
 
+    if not validate_esxi_host(server.get('host', '')):
+        return jsonify({'success': False, 'error': '不支持的目标主机'}), 400
+
     service_instance, error = connect_to_vsphere(server)
     if error:
         return jsonify({'success': False, 'error': error})
@@ -273,7 +281,7 @@ def api_check_server():
             }
         })
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
+        return jsonify({'success': False, 'error': '连接失败'})
 
 @main_bp.route('/api/vms', methods=['GET'])
 def api_list_vms():
@@ -462,19 +470,18 @@ def api_servers_detail():
             network_info = []
             try:
                 pnic_info = getattr(host_system.config.network, 'pnic', None)
-                write_log(f"PNIC info: {pnic_info}", "INFO")
                 if pnic_info:
                     for nic in pnic_info:
                         speed_gbps = 0
                         if hasattr(nic, 'linkSpeed') and nic.linkSpeed:
-                            speed_gbps = round(nic.linkSpeed.speedGb, 1)
+                            speed_mb = getattr(nic.linkSpeed, 'speedMb', 0)
+                            speed_gbps = round(speed_mb / 1024, 1) if speed_mb else 0
                         nic_data = {
                             'name': getattr(nic, 'device', 'Unknown'),
                             'mac': getattr(nic, 'mac', 'N/A'),
                             'speed_gbps': speed_gbps,
                             'status': 'up' if (hasattr(nic, 'linkSpeed') and nic.linkSpeed) else 'down'
                         }
-                        write_log(f"NIC data: {nic_data}", "INFO")
                         network_info.append(nic_data)
             except Exception as e:
                 write_log(f"Network info error: {str(e)}", "WARNING")
@@ -482,23 +489,18 @@ def api_servers_detail():
             gpu_info = []
             try:
                 devices = getattr(host_system.hardware, 'device', [])
-                write_log(f"GPU devices count: {len(devices)}", "INFO")
                 for device in devices:
                     device_str = str(device)
                     if 'NVIDIA' in device_str.upper() or 'GPU' in device_str.upper() or 'VGA' in device_str.upper():
-                        vram = 0
-                        if hasattr(device, 'videoRamSize'):
-                            vram = int(device.videoRamSize) // (1024**2)
                         gpu_info.append({
                             'name': getattr(device, 'name', str(device)),
                             'vendor': getattr(device, 'vendorName', 'Unknown'),
                             'model': getattr(device, 'name', str(device)),
-                            'vram': vram,
+                            'vram': 0,
                             'driver_version': getattr(device, 'driverVersion', 'N/A')
                         })
-                        write_log(f"GPU found: {gpu_info[-1]}", "INFO")
             except Exception as e:
-                write_log(f"GPU info error: {str(e)}", "WARNING")
+                pass
 
             if host_system.hardware.memorySize:
                 memory_total = host_system.hardware.memorySize / (1024**3)
@@ -557,6 +559,266 @@ def api_servers_detail():
             })
 
     return jsonify({'success': True, 'servers': detailed_servers})
+
+@main_bp.route('/api/vm/<vm_name>/detail', methods=['GET'])
+def api_vm_detail(vm_name):
+    server_host = request.args.get('server_host', '')
+    servers = load_servers()
+    server = next((s for s in servers if s.get('host') == server_host), servers[0] if servers else None)
+
+    if not server:
+        return jsonify({'success': False, 'error': 'Server not found'})
+
+    service_instance, error = connect_to_vsphere(server)
+    if error:
+        return jsonify({'success': False, 'error': error})
+
+    try:
+        content = service_instance.RetrieveContent()
+        container = content.rootFolder
+        view_type = [vim.VirtualMachine]
+        recursive = True
+        containerView = content.viewManager.CreateContainerView(container, view_type, recursive)
+
+        vm_obj = None
+        for vm in containerView.view:
+            if vm.name == vm_name:
+                vm_obj = vm
+                break
+
+        if not vm_obj:
+            connect.Disconnect(service_instance)
+            return jsonify({'success': False, 'error': f'VM {vm_name} not found'})
+
+        vm_summary = vm_obj.summary
+        vm_config = vm_obj.summary.config
+        vm_runtime = vm_obj.runtime
+
+        guest_info = {}
+        try:
+            if hasattr(vm.guest, 'ipAddress') and vm.guest.ipAddress:
+                guest_info['ip_address'] = vm.guest.ipAddress
+            guest_info['hostname'] = getattr(vm.guest, 'guestFullName', 'N/A')
+            guest_info['os_type'] = getattr(vm.guest, 'guestFamily', 'N/A')
+            guest_info['tools_status'] = str(getattr(vm.guest, 'toolsStatus', 'unknown'))
+            guest_info['tools_version'] = str(getattr(vm.guest, 'toolsVersion', 'unknown'))
+        except:
+            pass
+
+        net_devices = []
+        try:
+            for dev in vm_obj.config.hardware.device:
+                if isinstance(dev, vim.vm.device.VirtualEthernetCard):
+                    net_devices.append({
+                        'name': getattr(dev, 'deviceInfo', None) and dev.deviceInfo.label or 'Network Adapter',
+                        'mac': getattr(dev, 'macAddress', 'N/A'),
+                        'connected': getattr(dev, 'connectable', None) and dev.connectable.connected or False,
+                        'type': type(dev).__name__
+                    })
+        except:
+            pass
+
+        disk_devices = []
+        try:
+            for dev in vm_obj.config.hardware.device:
+                if isinstance(dev, vim.vm.device.VirtualDisk):
+                    disk_cap = getattr(dev, 'capacityInKB', 0)
+                    disk_devices.append({
+                        'name': getattr(dev, 'deviceInfo', None) and dev.deviceInfo.label or 'Disk',
+                        'capacity_gb': round(disk_cap / (1024 * 1024), 2),
+                        'type': getattr(dev, 'backing', None) and type(dev.backing).__name__ or 'Unknown'
+                    })
+        except:
+            pass
+
+        snapshot_info = {'count': 0, 'snapshots': []}
+        try:
+            if vm_obj.snapshot:
+                root_snap_list = vm_obj.snapshot.rootSnapshotList
+                def count_snapshots(snap_list):
+                    count = 0
+                    for snap in snap_list:
+                        count += 1
+                        if hasattr(snap, 'childSnapshotList') and snap.childSnapshotList:
+                            count += count_snapshots(snap.childSnapshotList)
+                    return count
+
+                def get_snapshots_info(snap_list, depth=0):
+                    result = []
+                    for snap in snap_list:
+                        result.append({
+                            'name': snap.name,
+                            'description': getattr(snap, 'description', ''),
+                            'creation_time': str(snap.createTime) if hasattr(snap, 'createTime') else 'N/A',
+                            'state': str(snap.state) if hasattr(snap, 'state') else 'N/A'
+                        })
+                        if hasattr(snap, 'childSnapshotList') and snap.childSnapshotList:
+                            result.extend(get_snapshots_info(snap.childSnapshotList, depth + 1))
+                    return result
+
+                snapshot_info['count'] = count_snapshots(root_snap_list)
+                snapshot_info['snapshots'] = get_snapshots_info(root_snap_list)
+        except:
+            pass
+
+        vm_detail = {
+            'name': vm_obj.name,
+            'state': get_vm_state_from_vm(vm_obj),
+            'server': server.get('name', server.get('host')),
+            'server_host': server.get('host'),
+            'uuid': vm_config.uuid,
+            'cpu': {
+                'count': vm_config.numCpu,
+                'cores': vm_config.numCpu,
+                'threads': getattr(vm_config, 'numCoresPerSocket', 0)
+            },
+            'memory': {
+                'total_gb': round(vm_config.memorySizeMB / 1024, 1),
+                'reservation': getattr(vm_config, 'memoryReservation', 0) or 0
+            },
+            'guest': guest_info,
+            'network': net_devices,
+            'disks': disk_devices,
+            'snapshots': snapshot_info,
+            'vm_path': getattr(vm_config, 'vmPathName', 'N/A'),
+            'annotation': getattr(vm_config, 'annotation', '') or '',
+            'uptime_seconds': getattr(vm_runtime, 'uptimeSeconds', 0),
+            'is_template': getattr(vm_runtime, 'template', False)
+        }
+
+        connect.Disconnect(service_instance)
+        return jsonify({'success': True, 'vm': vm_detail})
+
+    except Exception as e:
+        try:
+            connect.Disconnect(service_instance)
+        except:
+            pass
+        return jsonify({'success': False, 'error': str(e)})
+
+@main_bp.route('/api/vm/<vm_name>/performance', methods=['GET'])
+def api_vm_performance(vm_name):
+    server_host = request.args.get('server_host', '')
+    servers = load_servers()
+    server = next((s for s in servers if s.get('host') == server_host), servers[0] if servers else None)
+
+    if not server:
+        return jsonify({'success': False, 'error': 'Server not found'})
+
+    service_instance, error = connect_to_vsphere(server)
+    if error:
+        return jsonify({'success': False, 'error': error})
+
+    try:
+        content = service_instance.RetrieveContent()
+        container = content.rootFolder
+        view_type = [vim.VirtualMachine]
+        recursive = True
+        containerView = content.viewManager.CreateContainerView(container, view_type, recursive)
+
+        vm_obj = None
+        for vm in containerView.view:
+            if vm.name == vm_name:
+                vm_obj = vm
+                break
+
+        if not vm_obj:
+            connect.Disconnect(service_instance)
+            return jsonify({'success': False, 'error': f'VM {vm_name} not found'})
+
+        perf_manager = content.perfManager
+        perf_metrics = {}
+
+        try:
+            counter_map = {}
+            for counter in perf_manager.perfCounter:
+                counter_key = f"{counter.group}.{counter.name}.{counter.rollupType}"
+                counter_map[counter_key] = counter.key
+
+            metric_keys = {
+                'cpu.usage.average': 'cpu',
+                'mem.usage.average': 'memory',
+                'net.usage.average': 'network',
+                'disk.usage.average': 'disk'
+            }
+
+            for metric_name, metric_key in metric_keys.items():
+                if metric_name not in counter_map:
+                    continue
+
+                metric_id = vim.PerfManager.MetricId(
+                    counterId=counter_map[metric_name],
+                    instance=''
+                )
+                query_spec = vim.PerfQuerySpec(
+                    entity=vm_obj.vm,
+                    metricId=[metric_id],
+                    startTime=datetime.now() - timedelta(hours=1),
+                    endTime=datetime.now(),
+                    maxSample=60
+                )
+                try:
+                    stats = perf_manager.QueryPerf(query_spec)
+                    if stats and len(stats) > 0:
+                        values = []
+                        for sample in stats[0].sampleInfo:
+                            for val in stats[0].value:
+                                if val.value:
+                                    raw_value = val.value[0] if val.value else 0
+                                    if metric_key == 'network':
+                                        raw_value = raw_value / 1024
+                                    values.append({
+                                        'timestamp': str(sample.timestamp),
+                                        'value': round(raw_value, 2)
+                                    })
+                        perf_metrics[metric_name] = values
+                except Exception as e:
+                    write_log(f"QueryPerf error for {metric_name}: {str(e)}", "WARNING")
+        except Exception as e:
+            write_log(f"Performance metrics error: {str(e)}", "WARNING")
+
+        realtime_stats = {
+            'cpu_percent': 0,
+            'memory_percent': 0,
+            'disk_percent': 0,
+            'network_kbps': 0
+        }
+
+        try:
+            quick_stats = vm_obj.summary.quickStats
+            overall_cpu = getattr(quick_stats, 'overallCpuUsage', 0)
+            guest_cpu = getattr(quick_stats, 'guestCpuUsage', 0)
+
+            cpu_usage = overall_cpu if overall_cpu > 0 else guest_cpu
+            if cpu_usage > 0 and vm_obj.summary.config.numCpu > 0:
+                realtime_stats['cpu_percent'] = min(round(cpu_usage / vm_obj.summary.config.numCpu, 1), 100)
+
+            mem_usage = getattr(quick_stats, 'guestMemoryUsage', 0)
+            if mem_usage > 0:
+                total_mem_mb = vm_obj.summary.config.memorySizeMB
+                if total_mem_mb > 0:
+                    realtime_stats['memory_percent'] = min(round(mem_usage / total_mem_mb * 100, 1), 100)
+
+            net_usage = getattr(quick_stats, 'netUsage', 0)
+            if net_usage > 0:
+                realtime_stats['network_kbps'] = round(net_usage / 1024, 1)
+        except Exception as e:
+            write_log(f"Quick stats error: {str(e)}", "WARNING")
+
+        connect.Disconnect(service_instance)
+        return jsonify({
+            'success': True,
+            'vm_name': vm_name,
+            'realtime': realtime_stats,
+            'history': perf_metrics
+        })
+
+    except Exception as e:
+        try:
+            connect.Disconnect(service_instance)
+        except:
+            pass
+        return jsonify({'success': False, 'error': str(e)})
 
 @main_bp.route('/api/settings', methods=['GET'])
 def api_get_settings():
@@ -723,5 +985,23 @@ def api_run_task(task_id):
         from .scheduler import execute_task
         result = execute_task(task)
         return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@main_bp.route('/api/scheduler/tasks/<task_id>/webhook', methods=['POST'])
+def api_task_webhook(task_id):
+    try:
+        from .scheduler import load_tasks, save_tasks
+        tasks = load_tasks()
+        task = next((t for t in tasks if t.get('id') == task_id), None)
+        if not task:
+            return jsonify({'success': False, 'error': 'Task not found'})
+
+        data = request.get_json() or {}
+        task['notification_channels'] = data.get('notification_channels', {})
+        task['notify_enabled'] = bool(task['notification_channels'])
+
+        save_tasks(tasks)
+        return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
