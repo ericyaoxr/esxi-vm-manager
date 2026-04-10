@@ -169,7 +169,7 @@ async function loadServers() {
     try {
         const result = await apiRequest('/servers');
         if (result.success) {
-            servers = result.servers || [];
+            servers = (result.servers || []).sort((a, b) => a.host.localeCompare(b.host));
         }
     } catch (e) {
         console.error('加载服务器失败:', e);
@@ -385,7 +385,7 @@ async function loadVMs() {
         const vmOverviewDiv = document.getElementById('vm-overview');
 
         if (result.success && result.vms) {
-            vmData = result.vms;
+            vmData = result.vms.sort((a, b) => a.name.localeCompare(b.name));
 
             if (vmData.length === 0) {
                 if (vmListDiv) vmListDiv.innerHTML = '<p class="text-muted">未找到虚拟机</p>';
