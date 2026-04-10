@@ -1032,32 +1032,30 @@ textarea {
     white-space: nowrap;
 }
 
-.vm-state-badge {
-    font-size: 0.7rem;
-    padding: 2px 6px;
-    border-radius: 4px;
+.state-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
     flex-shrink: 0;
 }
 
-.vm-state-badge.powered-on {
-    background: rgba(16, 185, 129, 0.2);
-    color: var(--success-color);
+.state-dot.poweredon,
+.state-dot.powered-on {
+    background: var(--success-color);
 }
 
-.vm-state-badge.powered-off {
-    background: rgba(239, 68, 68, 0.2);
-    color: var(--danger-color);
+.state-dot.poweredoff,
+.state-dot.powered-off {
+    background: var(--danger-color);
 }
 
-.vm-state-badge.suspended,
-.vm-state-badge.unknown {
-    background: rgba(245, 158, 11, 0.2);
-    color: var(--warning-color);
+.state-dot.suspended,
+.state-dot.Suspended {
+    background: var(--warning-color);
 }
 
-.vm-state-badge.Suspended {
-    background: rgba(245, 158, 11, 0.2);
-    color: var(--warning-color);
+.state-dot.unknown {
+    background: var(--text-muted);
 }
 
 .modal-buttons {

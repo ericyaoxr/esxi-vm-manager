@@ -563,9 +563,9 @@ function updateSelectedVMPreview() {
         const stateIcon = vm.state === 'poweredOn' ? '🟢' : vm.state === 'poweredOff' ? '🔴' : '🟡';
         return `
             <div class="selected-vm-item">
+                <span class="state-dot ${stateClass}"></span>
                 <span class="selected-vm-name">${safeName}</span>
                 <span class="selected-vm-server">${safeServer}</span>
-                <span class="vm-state-badge ${stateClass}">${stateIcon} ${vm.state || 'Unknown'}</span>
             </div>
         `;
     }).join('');
@@ -653,24 +653,24 @@ async function startSelectedVMs(event) {
         return;
     }
 
-    const stoppedVMs = vmList.filter(vm => vm.state === 'poweredOff');
-    const nonStoppedVMs = vmList.filter(vm => vm.state !== 'poweredOff');
+    const startableVMs = vmList.filter(vm => vm.state === 'poweredOff' || vm.state === 'suspended');
+    const nonStartableVMs = vmList.filter(vm => vm.state !== 'poweredOff' && vm.state !== 'suspended');
 
-    if (stoppedVMs.length === 0) {
-        showToast('没有可启动的已关机虚拟机', 'warning');
+    if (startableVMs.length === 0) {
+        showToast('没有可启动的已关机或挂起的虚拟机', 'warning');
         isProcessing = false;
         return;
     }
 
-    if (nonStoppedVMs.length > 0) {
-        showToast(`已跳过 ${nonStoppedVMs.length} 台非关机状态虚拟机`, 'info');
+    if (nonStartableVMs.length > 0) {
+        showToast(`已跳过 ${nonStartableVMs.length} 台无法启动的虚拟机`, 'info');
     }
 
     setBatchButtonsDisabled(true);
     setVmsButtonsDisabled(true);
     vmList.forEach(vm => setVMButtonsDisabled(vm.name, vm.server_host, true));
-    showBatchProgress(stoppedVMs.length);
-    showVmsProgress(stoppedVMs.length);
+    showBatchProgress(startableVMs.length);
+    showVmsProgress(startableVMs.length);
     startExecutionTimer(startTime);
 
     startProgressCountdown(() => {
@@ -681,7 +681,7 @@ async function startSelectedVMs(event) {
     const result = await apiRequest('/batch-vm-action', {
         method: 'POST',
         body: JSON.stringify({
-            vms: stoppedVMs.map(vm => ({ name: vm.name, server_host: vm.server_host, action: 'start' })),
+            vms: startableVMs.map(vm => ({ name: vm.name, server_host: vm.server_host, action: 'start' })),
             delay: currentDelay
         })
     });
