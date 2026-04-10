@@ -135,10 +135,12 @@ async function checkConnection() {
 async function refreshStatus() {
     showLoading('正在刷新...');
     try {
-        await checkConnection();
-        await loadServers();
-        await loadVMs();
-        await loadFavorites();
+        const [connectionResult] = await Promise.all([
+            checkConnection(),
+            loadServers(),
+            loadVMs(),
+            loadFavorites()
+        ]);
         updateVMCards();
     } finally {
         setTimeout(hideLoading, 100);
