@@ -241,21 +241,28 @@ def api_get_config():
 
 @main_bp.route('/api/config', methods=['POST'])
 def api_save_config():
-    data = request.json
+    data = request.json or {}
 
     existing_config = get_config()
     if isinstance(existing_config, dict) and 'error' not in existing_config:
-        if 'basic_auth_password' not in data or not data.get('basic_auth_password'):
-            data['basic_auth_password'] = existing_config.get('basic_auth_password', '')
-        elif data.get('basic_auth_password') != existing_config.get('basic_auth_password'):
+        for key in existing_config:
+            if key not in data:
+                data[key] = existing_config[key]
+
+        if 'basic_auth_password' in data and data['basic_auth_password'] and data['basic_auth_password'] != existing_config.get('basic_auth_password', ''):
             from app.security import encrypt_password
             data['basic_auth_password'] = encrypt_password(data['basic_auth_password'])
-
-        if 'basic_auth_username' not in data:
-            data['basic_auth_username'] = existing_config.get('basic_auth_username', '')
+        elif 'basic_auth_password' not in data or not data['basic_auth_password']:
+            data['basic_auth_password'] = existing_config.get('basic_auth_password', '')
 
         if 'allowed_ips' not in data:
             data['allowed_ips'] = existing_config.get('allowed_ips', [])
+
+    required_keys = ['natural_sort', 'default_delay', 'basic_auth_enabled', 'ip_whitelist_enabled',
+                     'allowed_ips', 'api_timeout', 'scheduler_enabled', 'task_timeout', 'log_enabled']
+    for key in required_keys:
+        if key not in data:
+            data[key] = False if key in ['natural_sort', 'ip_whitelist_enabled', 'basic_auth_enabled', 'scheduler_enabled', 'log_enabled'] else 0
 
     result = save_config(data)
     if result is True:

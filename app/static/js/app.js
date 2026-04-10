@@ -78,62 +78,119 @@ function updateNaturalSortDisplay() {
     if (checkbox) checkbox.checked = naturalSort;
 }
 
-function toggleNaturalSort(enabled) {
-    naturalSort = enabled;
-    saveSettings();
-    loadServers();
-    loadVMs();
+function switchSettingsTab(tabName) {
+    document.querySelectorAll('.settings-tab').forEach(tab => tab.classList.remove('active'));
+    document.querySelectorAll('.settings-tab-panel').forEach(panel => panel.classList.remove('active'));
+    document.querySelector(`.settings-tab[data-tab="${tabName}"]`).classList.add('active');
+    document.getElementById(`settings-tab-${tabName}`).classList.add('active');
 }
 
-async function saveSecuritySettings() {
-    const username = document.getElementById('setting-auth-username').value.trim();
+async function openSettingsModal() {
+    const modal = document.getElementById('settings-modal');
+    if (modal) modal.style.display = 'flex';
+
+    const result = await apiRequest('/api/config');
+    if (result.success && result.config) {
+        const config = result.config;
+        document.getElementById('setting-natural-sort').checked = config.natural_sort || false;
+        document.getElementById('setting-default-delay').value = config.default_delay || 0;
+        document.getElementById('setting-auth-username').value = config.basic_auth_username || '';
+        document.getElementById('setting-auth-password').value = '';
+        document.getElementById('setting-auth-enabled').checked = !!(config.basic_auth_username || config.basic_auth_password);
+        document.getElementById('setting-ip-whitelist').checked = config.ip_whitelist_enabled || false;
+        document.getElementById('setting-allowed-ips').value = (config.allowed_ips || []).join('\n');
+        document.getElementById('setting-api-timeout').value = config.api_timeout || 30;
+        document.getElementById('setting-scheduler-enabled').checked = config.scheduler_enabled !== false;
+        document.getElementById('setting-task-timeout').value = config.task_timeout || 10;
+        document.getElementById('setting-log-enabled').checked = config.log_enabled !== false;
+    }
+    hideSettingsMessage();
+}
+
+function showSettingsMessage(message, isError = false) {
+    const msgEl = document.getElementById('settings-message');
+    msgEl.textContent = message;
+    msgEl.className = 'settings-message ' + (isError ? 'error' : 'success');
+    msgEl.style.display = 'block';
+}
+
+function hideSettingsMessage() {
+    document.getElementById('settings-message').style.display = 'none';
+}
+
+function validateSettings() {
+    const timeout = parseInt(document.getElementById('setting-api-timeout').value);
+    if (isNaN(timeout) || timeout < 5 || timeout > 120) {
+        showSettingsMessage('API请求超时必须在5-120秒之间', true);
+        return false;
+    }
+    const taskTimeout = parseInt(document.getElementById('setting-task-timeout').value);
+    if (isNaN(taskTimeout) || taskTimeout < 1 || taskTimeout > 60) {
+        showSettingsMessage('任务执行超时必须在1-60分钟之间', true);
+        return false;
+    }
+    const delay = parseInt(document.getElementById('setting-default-delay').value);
+    if (isNaN(delay) || delay < 0 || delay > 300) {
+        showSettingsMessage('批量操作间隔必须在0-300秒之间', true);
+        return false;
+    }
+    return true;
+}
+
+async function saveAllSettings() {
+    if (!validateSettings()) return;
+
+    const settings = {
+        natural_sort: document.getElementById('setting-natural-sort').checked,
+        default_delay: parseInt(document.getElementById('setting-default-delay').value) || 0,
+        basic_auth_username: document.getElementById('setting-auth-username').value.trim(),
+        basic_auth_enabled: document.getElementById('setting-auth-enabled').checked,
+        ip_whitelist_enabled: document.getElementById('setting-ip-whitelist').checked,
+        allowed_ips: document.getElementById('setting-allowed-ips').value.split('\n').map(ip => ip.trim()).filter(ip => ip),
+        api_timeout: parseInt(document.getElementById('setting-api-timeout').value) || 30,
+        scheduler_enabled: document.getElementById('setting-scheduler-enabled').checked,
+        task_timeout: parseInt(document.getElementById('setting-task-timeout').value) || 10,
+        log_enabled: document.getElementById('setting-log-enabled').checked
+    };
+
     const password = document.getElementById('setting-auth-password').value;
+    if (password) {
+        settings.basic_auth_password = password;
+    }
 
     const result = await apiRequest('/api/config', {
         method: 'POST',
-        body: JSON.stringify({
-            basic_auth_username: username,
-            basic_auth_password: password
-        })
+        body: JSON.stringify(settings)
     });
 
     if (result.success) {
-        alert('安全设置已保存');
+        showSettingsMessage('设置已保存成功！');
+        naturalSort = settings.natural_sort;
+        currentDelay = settings.default_delay;
+        setTimeout(() => {
+            closeSettingsModal();
+            loadServers();
+            loadVMs();
+        }, 1000);
     } else {
-        alert('保存失败: ' + result.error);
+        showSettingsMessage('保存失败: ' + (result.error || '未知错误'), true);
     }
 }
 
-async function saveIpWhitelistSettings() {
-    const enabled = document.getElementById('setting-ip-whitelist').checked;
-    const allowedIps = document.getElementById('setting-allowed-ips').value.trim();
-
-    const ips = allowedIps.split('\n').map(ip => ip.trim()).filter(ip => ip);
-
-    const result = await apiRequest('/api/config', {
-        method: 'POST',
-        body: JSON.stringify({
-            ip_whitelist_enabled: enabled,
-            allowed_ips: ips
-        })
-    });
-
-    if (result.success) {
-        alert('IP白名单已保存');
-    } else {
-        alert('保存失败: ' + result.error);
-    }
-}
-
-async function saveSettings() {
-    try {
-        await apiRequest('/settings', {
-            method: 'POST',
-            body: JSON.stringify({ delay: currentDelay, naturalSort: naturalSort })
-        });
-    } catch (e) {
-        console.warn('保存设置失败:', e);
-    }
+function resetSettingsToDefaults() {
+    if (!confirm('确定要恢复所有设置为默认值吗？')) return;
+    document.getElementById('setting-natural-sort').checked = false;
+    document.getElementById('setting-default-delay').value = 0;
+    document.getElementById('setting-auth-username').value = '';
+    document.getElementById('setting-auth-password').value = '';
+    document.getElementById('setting-auth-enabled').checked = false;
+    document.getElementById('setting-ip-whitelist').checked = false;
+    document.getElementById('setting-allowed-ips').value = '';
+    document.getElementById('setting-api-timeout').value = 30;
+    document.getElementById('setting-scheduler-enabled').checked = true;
+    document.getElementById('setting-task-timeout').value = 10;
+    document.getElementById('setting-log-enabled').checked = true;
+    showSettingsMessage('已恢复默认值，请点击"保存设置"以应用');
 }
 
 async function apiRequest(endpoint, options = {}) {

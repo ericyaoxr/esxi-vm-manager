@@ -166,50 +166,108 @@
             </section>
 
             <div id="settings-modal" class="modal">
-                <div class="modal-content">
+                <div class="modal-content settings-modal-content">
                     <h3>⚙️ 系统设置</h3>
-                    <div class="settings-section">
-                        <h4>🔤 排序设置</h4>
-                        <p class="settings-desc">支持名称中包含数字的自然排序（如 vm1, vm2, vm10 会按数字大小排序）</p>
-                        <div class="setting-item">
-                            <label>
-                                <input type="checkbox" id="setting-natural-sort" onchange="toggleNaturalSort(this.checked)">
-                                启用自然排序
-                            </label>
+                    <div class="settings-tabs">
+                        <button class="settings-tab active" data-tab="general" onclick="switchSettingsTab('general')">通用</button>
+                        <button class="settings-tab" data-tab="security" onclick="switchSettingsTab('security')">安全</button>
+                        <button class="settings-tab" data-tab="network" onclick="switchSettingsTab('network')">网络</button>
+                        <button class="settings-tab" data-tab="scheduler" onclick="switchSettingsTab('scheduler')">定时任务</button>
+                        <button class="settings-tab" data-tab="about" onclick="switchSettingsTab('about')">关于</button>
+                    </div>
+                    <div class="settings-content">
+                        <div id="settings-tab-general" class="settings-tab-panel active">
+                            <h4>🔤 排序设置</h4>
+                            <p class="settings-desc">支持名称中包含数字的自然排序（如 vm1, vm2, vm10 会按数字大小排序）</p>
+                            <div class="setting-item">
+                                <label>
+                                    <input type="checkbox" id="setting-natural-sort">
+                                    启用自然排序
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label>批量操作默认间隔时间（秒）</label>
+                                <input type="number" id="setting-default-delay" min="0" max="300" value="0">
+                                <span class="form-hint">批量操作时每台虚拟机之间的等待时间</span>
+                            </div>
+                        </div>
+                        <div id="settings-tab-security" class="settings-tab-panel">
+                            <h4>🔐 API认证</h4>
+                            <p class="settings-desc">设置HTTP Basic Auth认证，保护API接口访问</p>
+                            <div class="form-group">
+                                <label>用户名</label>
+                                <input type="text" id="setting-auth-username" placeholder="留空则不启用认证">
+                            </div>
+                            <div class="form-group">
+                                <label>密码</label>
+                                <input type="password" id="setting-auth-password" placeholder="输入新密码以更改">
+                                <span class="form-hint">留空表示不更改当前密码</span>
+                            </div>
+                            <h4>⏱️ 认证保护路径</h4>
+                            <div class="setting-item">
+                                <label>
+                                    <input type="checkbox" id="setting-auth-enabled">
+                                    启用API认证
+                                </label>
+                            </div>
+                        </div>
+                        <div id="settings-tab-network" class="settings-tab-panel">
+                            <h4>🌐 IP访问控制</h4>
+                            <div class="setting-item">
+                                <label>
+                                    <input type="checkbox" id="setting-ip-whitelist">
+                                    启用IP白名单
+                                </label>
+                            </div>
+                            <p class="settings-desc">启用后，仅允许以下IP地址访问</p>
+                            <div class="form-group">
+                                <label>允许的IP/网段（每行一个）</label>
+                                <textarea id="setting-allowed-ips" rows="4" placeholder="192.168.1.1&#10;10.0.0.0/8&#10;127.0.0.1"></textarea>
+                                <span class="form-hint">支持单个IP或CIDR网段格式，留空仅允许本地访问</span>
+                            </div>
+                            <h4>🔗 连接设置</h4>
+                            <div class="form-group">
+                                <label>API请求超时（秒）</label>
+                                <input type="number" id="setting-api-timeout" min="5" max="120" value="30">
+                            </div>
+                        </div>
+                        <div id="settings-tab-scheduler" class="settings-tab-panel">
+                            <h4>⏰ 定时任务</h4>
+                            <div class="setting-item">
+                                <label>
+                                    <input type="checkbox" id="setting-scheduler-enabled">
+                                    启用定时任务
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label>任务执行超时（分钟）</label>
+                                <input type="number" id="setting-task-timeout" min="1" max="60" value="10">
+                            </div>
+                            <h4>📋 日志设置</h4>
+                            <div class="setting-item">
+                                <label>
+                                    <input type="checkbox" id="setting-log-enabled" checked>
+                                    启用操作日志
+                                </label>
+                            </div>
+                        </div>
+                        <div id="settings-tab-about" class="settings-tab-panel">
+                            <div class="about-section">
+                                <h4>ESXi 虚拟机管理器</h4>
+                                <p class="version">版本 1.0.0</p>
+                                <p class="tech-stack">基于 Flask + Vue.js 构建</p>
+                                <p class="copyright">© 2024-2026 Ericyaoxr</p>
+                                <div class="about-links">
+                                    <a href="https://github.com/ericyaoxr/esxi-vm-manager" target="_blank">GitHub</a>
+                                    <a href="https://github.com/ericyaoxr/esxi-vm-manager/issues" target="_blank">问题反馈</a>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div class="settings-section">
-                        <h4>🔒 安全设置</h4>
-                        <div class="form-group">
-                            <label>Basic Auth 用户名</label>
-                            <input type="text" id="setting-auth-username" placeholder="留空则不启用认证">
-                        </div>
-                        <div class="form-group">
-                            <label>Basic Auth 密码</label>
-                            <input type="password" id="setting-auth-password" placeholder="留空则不启用认证">
-                        </div>
-                        <button class="btn btn-sm btn-secondary" onclick="saveSecuritySettings()">保存安全设置</button>
-                    </div>
-                    <div class="settings-section">
-                        <h4>🌐 IP白名单</h4>
-                        <div class="setting-item">
-                            <label>
-                                <input type="checkbox" id="setting-ip-whitelist" onchange="toggleIpWhitelist(this.checked)">
-                                启用IP白名单
-                            </label>
-                        </div>
-                        <div class="form-group">
-                            <label>允许的IP（每行一个，留空则仅允许本地）</label>
-                            <textarea id="setting-allowed-ips" rows="3" placeholder="192.168.1.1&#10;10.0.0.0/8"></textarea>
-                        </div>
-                        <button class="btn btn-sm btn-secondary" onclick="saveIpWhitelistSettings()">保存白名单</button>
-                    </div>
-                    <div class="settings-section">
-                        <h4>ℹ️ 关于系统</h4>
-                        <p>ESXi 虚拟机管理器 v1.0</p>
-                        <p class="text-muted">基于 Flask + Vue.js 构建</p>
-                    </div>
+                    <div id="settings-message" class="settings-message" style="display:none;"></div>
                     <div class="modal-buttons">
+                        <button class="btn btn-secondary" onclick="resetSettingsToDefaults()">恢复默认</button>
+                        <button class="btn btn-primary" onclick="saveAllSettings()">保存设置</button>
                         <button class="btn btn-primary" onclick="closeSettingsModal()">关闭</button>
                     </div>
                 </div>
