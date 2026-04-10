@@ -97,13 +97,27 @@ async function saveSettings() {
 }
 
 async function apiRequest(endpoint, options = {}) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
     try {
         const response = await fetch(API_BASE + endpoint, {
             headers: {
                 'Content-Type': 'application/json',
             },
+            signal: controller.signal,
             ...options
         });
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+            const text = await response.text().catch(() => 'Request failed');
+            if (text.startsWith('<') && text.includes('Unexpected token')) {
+                return { success: false, error: '服务器错误，请检查网络连接' };
+            }
+            return { success: false, error: `HTTP ${response.status}: ${text}` };
+        }
+
         const contentType = response.headers.get('content-type');
         if (contentType && contentType.includes('application/json')) {
             return await response.json();
@@ -114,7 +128,10 @@ async function apiRequest(endpoint, options = {}) {
         }
         return { success: false, error: text };
     } catch (error) {
-        console.error('API Error:', error);
+        clearTimeout(timeoutId);
+        if (error.name === 'AbortError') {
+            return { success: false, error: '请求超时，请检查网络连接' };
+        }
         return { success: false, error: error.message };
     }
 }
