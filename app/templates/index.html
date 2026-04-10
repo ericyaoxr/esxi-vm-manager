@@ -169,7 +169,7 @@
                 <div class="modal-content">
                     <h3>⚙️ 系统设置</h3>
                     <div class="settings-section">
-                        <h4>🔀 排序设置</h4>
+                        <h4>🔤 排序设置</h4>
                         <p class="settings-desc">支持名称中包含数字的自然排序（如 vm1, vm2, vm10 会按数字大小排序）</p>
                         <div class="setting-item">
                             <label>
@@ -177,6 +177,32 @@
                                 启用自然排序
                             </label>
                         </div>
+                    </div>
+                    <div class="settings-section">
+                        <h4>🔒 安全设置</h4>
+                        <div class="form-group">
+                            <label>Basic Auth 用户名</label>
+                            <input type="text" id="setting-auth-username" placeholder="留空则不启用认证">
+                        </div>
+                        <div class="form-group">
+                            <label>Basic Auth 密码</label>
+                            <input type="password" id="setting-auth-password" placeholder="留空则不启用认证">
+                        </div>
+                        <button class="btn btn-sm btn-secondary" onclick="saveSecuritySettings()">保存安全设置</button>
+                    </div>
+                    <div class="settings-section">
+                        <h4>🌐 IP白名单</h4>
+                        <div class="setting-item">
+                            <label>
+                                <input type="checkbox" id="setting-ip-whitelist" onchange="toggleIpWhitelist(this.checked)">
+                                启用IP白名单
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label>允许的IP（每行一个，留空则仅允许本地）</label>
+                            <textarea id="setting-allowed-ips" rows="3" placeholder="192.168.1.1&#10;10.0.0.0/8"></textarea>
+                        </div>
+                        <button class="btn btn-sm btn-secondary" onclick="saveIpWhitelistSettings()">保存白名单</button>
                     </div>
                     <div class="settings-section">
                         <h4>ℹ️ 关于系统</h4>

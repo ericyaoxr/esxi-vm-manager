@@ -85,6 +85,46 @@ function toggleNaturalSort(enabled) {
     loadVMs();
 }
 
+async function saveSecuritySettings() {
+    const username = document.getElementById('setting-auth-username').value.trim();
+    const password = document.getElementById('setting-auth-password').value;
+
+    const result = await apiRequest('/api/config', {
+        method: 'POST',
+        body: JSON.stringify({
+            basic_auth_username: username,
+            basic_auth_password: password
+        })
+    });
+
+    if (result.success) {
+        alert('安全设置已保存');
+    } else {
+        alert('保存失败: ' + result.error);
+    }
+}
+
+async function saveIpWhitelistSettings() {
+    const enabled = document.getElementById('setting-ip-whitelist').checked;
+    const allowedIps = document.getElementById('setting-allowed-ips').value.trim();
+
+    const ips = allowedIps.split('\n').map(ip => ip.trim()).filter(ip => ip);
+
+    const result = await apiRequest('/api/config', {
+        method: 'POST',
+        body: JSON.stringify({
+            ip_whitelist_enabled: enabled,
+            allowed_ips: ips
+        })
+    });
+
+    if (result.success) {
+        alert('IP白名单已保存');
+    } else {
+        alert('保存失败: ' + result.error);
+    }
+}
+
 async function saveSettings() {
     try {
         await apiRequest('/settings', {

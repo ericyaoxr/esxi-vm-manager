@@ -1,5 +1,5 @@
 from app.security import encrypt_password, decrypt_password, validate_esxi_host
-from app import limiter
+from app.extensions import limiter
 import os
 import json
 import ssl
@@ -242,6 +242,21 @@ def api_get_config():
 @main_bp.route('/api/config', methods=['POST'])
 def api_save_config():
     data = request.json
+
+    existing_config = get_config()
+    if isinstance(existing_config, dict) and 'error' not in existing_config:
+        if 'basic_auth_password' not in data or not data.get('basic_auth_password'):
+            data['basic_auth_password'] = existing_config.get('basic_auth_password', '')
+        elif data.get('basic_auth_password') != existing_config.get('basic_auth_password'):
+            from app.security import encrypt_password
+            data['basic_auth_password'] = encrypt_password(data['basic_auth_password'])
+
+        if 'basic_auth_username' not in data:
+            data['basic_auth_username'] = existing_config.get('basic_auth_username', '')
+
+        if 'allowed_ips' not in data:
+            data['allowed_ips'] = existing_config.get('allowed_ips', [])
+
     result = save_config(data)
     if result is True:
         write_log("Configuration saved")

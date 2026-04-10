@@ -1,7 +1,6 @@
 import os
 from flask import Flask, jsonify, request
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
+from app.extensions import limiter
 from app.main import main_bp
 from app.security import is_ip_allowed, get_client_ip
 
@@ -10,11 +9,6 @@ try:
     load_dotenv()
 except ImportError:
     pass
-
-limiter = Limiter(
-    key_func=get_remote_address,
-    default_limits=["200 per day", "50 per hour"]
-)
 
 def create_app():
     app = Flask(__name__)
