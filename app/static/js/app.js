@@ -559,10 +559,13 @@ function updateSelectedVMPreview() {
     const vmItems = selectedList.map(vm => {
         const safeName = escapeHtml(vm.name);
         const safeServer = escapeHtml(vm.server || vm.server_host);
+        const stateClass = vm.state ? vm.state.toLowerCase().replace(' ', '-') : 'unknown';
+        const stateIcon = vm.state === 'poweredOn' ? '🟢' : vm.state === 'poweredOff' ? '🔴' : '🟡';
         return `
             <div class="selected-vm-item">
                 <span class="selected-vm-name">${safeName}</span>
                 <span class="selected-vm-server">${safeServer}</span>
+                <span class="vm-state-badge ${stateClass}">${stateIcon} ${vm.state || 'Unknown'}</span>
             </div>
         `;
     }).join('');
@@ -587,6 +590,20 @@ async function suspendSelectedVMs(event) {
         return;
     }
 
+    const runningVMs = vmList.filter(vm => vm.state === 'poweredOn');
+    const nonRunningVMs = vmList.filter(vm => vm.state !== 'poweredOn');
+
+    if (nonRunningVMs.length > 0) {
+        const names = nonRunningVMs.map(vm => vm.name).join(', ');
+        showToast(`以下虚拟机非运行状态已跳过: ${names}`, 'warning');
+    }
+
+    if (runningVMs.length === 0) {
+        showToast('没有可挂起的运行中虚拟机', 'warning');
+        isProcessing = false;
+        return;
+    }
+
     setBatchButtonsDisabled(true);
     setVmsButtonsDisabled(true);
     vmList.forEach(vm => setVMButtonsDisabled(vm.name, vm.server_host, true));
@@ -602,7 +619,7 @@ async function suspendSelectedVMs(event) {
     const result = await apiRequest('/batch-vm-action', {
         method: 'POST',
         body: JSON.stringify({
-            vms: vmList.map(vm => ({ name: vm.name, server_host: vm.server_host, action: 'suspend' })),
+            vms: runningVMs.map(vm => ({ name: vm.name, server_host: vm.server_host, action: 'suspend' })),
             delay: currentDelay
         })
     });
@@ -637,6 +654,20 @@ async function startSelectedVMs(event) {
         return;
     }
 
+    const stoppedVMs = vmList.filter(vm => vm.state === 'poweredOff');
+    const nonStoppedVMs = vmList.filter(vm => vm.state !== 'poweredOff');
+
+    if (nonStoppedVMs.length > 0) {
+        const names = nonStoppedVMs.map(vm => vm.name).join(', ');
+        showToast(`以下虚拟机非关机状态已跳过: ${names}`, 'warning');
+    }
+
+    if (stoppedVMs.length === 0) {
+        showToast('没有可启动的已关机虚拟机', 'warning');
+        isProcessing = false;
+        return;
+    }
+
     setBatchButtonsDisabled(true);
     setVmsButtonsDisabled(true);
     vmList.forEach(vm => setVMButtonsDisabled(vm.name, vm.server_host, true));
@@ -652,7 +683,7 @@ async function startSelectedVMs(event) {
     const result = await apiRequest('/batch-vm-action', {
         method: 'POST',
         body: JSON.stringify({
-            vms: vmList.map(vm => ({ name: vm.name, server_host: vm.server_host, action: 'start' })),
+            vms: stoppedVMs.map(vm => ({ name: vm.name, server_host: vm.server_host, action: 'start' })),
             delay: currentDelay
         })
     });

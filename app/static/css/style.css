@@ -1027,6 +1027,34 @@ textarea {
     white-space: nowrap;
 }
 
+.vm-state-badge {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+.vm-state-badge.powered-on {
+    background: rgba(16, 185, 129, 0.2);
+    color: var(--success-color);
+}
+
+.vm-state-badge.powered-off {
+    background: rgba(239, 68, 68, 0.2);
+    color: var(--danger-color);
+}
+
+.vm-state-badge.suspended,
+.vm-state-badge.unknown {
+    background: rgba(245, 158, 11, 0.2);
+    color: var(--warning-color);
+}
+
+.vm-state-badge.Suspended {
+    background: rgba(245, 158, 11, 0.2);
+    color: var(--warning-color);
+}
+
 .modal-buttons {
     display: flex;
     gap: 8px;
