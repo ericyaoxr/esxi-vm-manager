@@ -1349,9 +1349,23 @@ function showHelp() {
     if (credentialsBtn) credentialsBtn.click();
 }
 
-function openSettingsModal() {
+async function openSettingsModal() {
     const modal = document.getElementById('settings-modal');
     if (modal) modal.style.display = 'flex';
+
+    const result = await apiRequest('/api/config');
+    if (result.success && result.config) {
+        const config = result.config;
+        const usernameInput = document.getElementById('setting-auth-username');
+        const passwordInput = document.getElementById('setting-auth-password');
+        const ipWhitelistCheckbox = document.getElementById('setting-ip-whitelist');
+        const allowedIpsInput = document.getElementById('setting-allowed-ips');
+
+        if (usernameInput) usernameInput.value = config.basic_auth_username || '';
+        if (passwordInput) passwordInput.value = '';
+        if (ipWhitelistCheckbox) ipWhitelistCheckbox.checked = config.ip_whitelist_enabled || false;
+        if (allowedIpsInput) allowedIpsInput.value = (config.allowed_ips || []).join('\n');
+    }
 }
 
 function closeSettingsModal() {
