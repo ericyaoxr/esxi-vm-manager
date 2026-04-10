@@ -1,6 +1,5 @@
 import os
 from flask import Flask, jsonify, request
-from flask_wtf.csrf import CSRFProtect
 from app.main import main_bp
 from app.security import is_ip_allowed, get_client_ip
 
@@ -13,9 +12,8 @@ except ImportError:
 def create_app():
     app = Flask(__name__)
     app.config['SECRET_KEY'] = os.environ.get('FLASK_SECRET_KEY') or 'esxi-vm-manager-secret-key'
-    app.config['WTF_CSRF_ENABLED'] = True
+    app.config['WTF_CSRF_ENABLED'] = False
     app.config['WTF_CSRF_CHECK_DEFAULT'] = False
-    CSRFProtect(app)
     app.register_blueprint(main_bp)
 
     basic_auth_creds = os.environ.get('BASIC_AUTH_CREDENTIALS', '')
