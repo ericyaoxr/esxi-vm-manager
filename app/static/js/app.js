@@ -2140,6 +2140,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadSettings();
     await refreshStatus();
 
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.ready.then((registration) => {
+            registration.active.postMessage({ type: 'CLEAR_CACHE' });
+        });
+    }
+
     if (!localStorage.getItem('welcomeShown') && servers.length === 0) {
         setTimeout(() => openWelcomeModal(), 500);
     }
