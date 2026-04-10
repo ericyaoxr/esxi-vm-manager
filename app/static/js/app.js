@@ -593,22 +593,21 @@ async function suspendSelectedVMs(event) {
     const runningVMs = vmList.filter(vm => vm.state === 'poweredOn');
     const nonRunningVMs = vmList.filter(vm => vm.state !== 'poweredOn');
 
-    if (nonRunningVMs.length > 0) {
-        const names = nonRunningVMs.map(vm => vm.name).join(', ');
-        showToast(`以下虚拟机非运行状态已跳过: ${names}`, 'warning');
-    }
-
     if (runningVMs.length === 0) {
         showToast('没有可挂起的运行中虚拟机', 'warning');
         isProcessing = false;
         return;
     }
 
+    if (nonRunningVMs.length > 0) {
+        showToast(`已跳过 ${nonRunningVMs.length} 台非运行状态虚拟机`, 'info');
+    }
+
     setBatchButtonsDisabled(true);
     setVmsButtonsDisabled(true);
     vmList.forEach(vm => setVMButtonsDisabled(vm.name, vm.server_host, true));
-    showBatchProgress(vmList.length);
-    showVmsProgress(vmList.length);
+    showBatchProgress(runningVMs.length);
+    showVmsProgress(runningVMs.length);
     startExecutionTimer(startTime);
 
     startProgressCountdown(() => {
@@ -657,22 +656,21 @@ async function startSelectedVMs(event) {
     const stoppedVMs = vmList.filter(vm => vm.state === 'poweredOff');
     const nonStoppedVMs = vmList.filter(vm => vm.state !== 'poweredOff');
 
-    if (nonStoppedVMs.length > 0) {
-        const names = nonStoppedVMs.map(vm => vm.name).join(', ');
-        showToast(`以下虚拟机非关机状态已跳过: ${names}`, 'warning');
-    }
-
     if (stoppedVMs.length === 0) {
         showToast('没有可启动的已关机虚拟机', 'warning');
         isProcessing = false;
         return;
     }
 
+    if (nonStoppedVMs.length > 0) {
+        showToast(`已跳过 ${nonStoppedVMs.length} 台非关机状态虚拟机`, 'info');
+    }
+
     setBatchButtonsDisabled(true);
     setVmsButtonsDisabled(true);
     vmList.forEach(vm => setVMButtonsDisabled(vm.name, vm.server_host, true));
-    showBatchProgress(vmList.length);
-    showVmsProgress(vmList.length);
+    showBatchProgress(stoppedVMs.length);
+    showVmsProgress(stoppedVMs.length);
     startExecutionTimer(startTime);
 
     startProgressCountdown(() => {
