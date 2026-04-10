@@ -1238,7 +1238,8 @@ function closeWelcomeModal() {
 
 function showHelp() {
     closeWelcomeModal();
-    switchTab('credentials');
+    const credentialsBtn = document.querySelector('.nav-btn[data-tab="credentials"]');
+    if (credentialsBtn) credentialsBtn.click();
 }
 
 async function testConnection() {
@@ -2079,7 +2080,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadSettings();
     await refreshStatus();
 
-    if (!localStorage.getItem('welcomeShown')) {
+    if (!localStorage.getItem('welcomeShown') && servers.length === 0) {
         setTimeout(() => openWelcomeModal(), 500);
     }
 });
