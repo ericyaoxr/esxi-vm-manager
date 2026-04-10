@@ -92,8 +92,11 @@ async function openSettingsModal() {
     const result = await apiRequest('/api/config');
     if (result.success && result.config) {
         const config = result.config;
-        document.getElementById('setting-natural-sort').checked = config.natural_sort || false;
+        document.getElementById('setting-auto-refresh').value = config.auto_refresh || 0;
         document.getElementById('setting-default-delay').value = config.default_delay || 0;
+        document.getElementById('setting-show-stopped').checked = config.show_stopped !== false;
+        document.getElementById('setting-confirm-batch').checked = config.confirm_batch !== false;
+        document.getElementById('setting-natural-sort').checked = config.natural_sort || false;
         document.getElementById('setting-auth-username').value = config.basic_auth_username || '';
         document.getElementById('setting-auth-password').value = '';
         document.getElementById('setting-auth-enabled').checked = !!(config.basic_auth_username || config.basic_auth_password);
@@ -134,6 +137,11 @@ function validateSettings() {
         showSettingsMessage('批量操作间隔必须在0-300秒之间', true);
         return false;
     }
+    const autoRefresh = parseInt(document.getElementById('setting-auto-refresh').value);
+    if (isNaN(autoRefresh) || autoRefresh < 0 || autoRefresh > 300) {
+        showSettingsMessage('自动刷新间隔必须在0-300秒之间', true);
+        return false;
+    }
     return true;
 }
 
@@ -141,8 +149,11 @@ async function saveAllSettings() {
     if (!validateSettings()) return;
 
     const settings = {
-        natural_sort: document.getElementById('setting-natural-sort').checked,
+        auto_refresh: parseInt(document.getElementById('setting-auto-refresh').value) || 0,
         default_delay: parseInt(document.getElementById('setting-default-delay').value) || 0,
+        show_stopped: document.getElementById('setting-show-stopped').checked,
+        confirm_batch: document.getElementById('setting-confirm-batch').checked,
+        natural_sort: document.getElementById('setting-natural-sort').checked,
         basic_auth_username: document.getElementById('setting-auth-username').value.trim(),
         basic_auth_enabled: document.getElementById('setting-auth-enabled').checked,
         ip_whitelist_enabled: document.getElementById('setting-ip-whitelist').checked,
@@ -179,8 +190,11 @@ async function saveAllSettings() {
 
 function resetSettingsToDefaults() {
     if (!confirm('确定要恢复所有设置为默认值吗？')) return;
-    document.getElementById('setting-natural-sort').checked = false;
+    document.getElementById('setting-auto-refresh').value = 0;
     document.getElementById('setting-default-delay').value = 0;
+    document.getElementById('setting-show-stopped').checked = true;
+    document.getElementById('setting-confirm-batch').checked = true;
+    document.getElementById('setting-natural-sort').checked = false;
     document.getElementById('setting-auth-username').value = '';
     document.getElementById('setting-auth-password').value = '';
     document.getElementById('setting-auth-enabled').checked = false;

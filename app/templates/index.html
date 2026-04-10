@@ -177,18 +177,35 @@
                     </div>
                     <div class="settings-content">
                         <div id="settings-tab-general" class="settings-tab-panel active">
-                            <h4>🔤 排序设置</h4>
-                            <p class="settings-desc">支持名称中包含数字的自然排序（如 vm1, vm2, vm10 会按数字大小排序）</p>
-                            <div class="setting-item">
-                                <label>
-                                    <input type="checkbox" id="setting-natural-sort">
-                                    启用自然排序
-                                </label>
+                            <h4>🔄 运行参数</h4>
+                            <div class="form-group">
+                                <label>虚拟机列表自动刷新间隔（秒）</label>
+                                <input type="number" id="setting-auto-refresh" min="0" max="300" value="0">
+                                <span class="form-hint">0表示不自动刷新</span>
                             </div>
                             <div class="form-group">
                                 <label>批量操作默认间隔时间（秒）</label>
                                 <input type="number" id="setting-default-delay" min="0" max="300" value="0">
                                 <span class="form-hint">批量操作时每台虚拟机之间的等待时间</span>
+                            </div>
+                            <h4>📺 界面显示</h4>
+                            <div class="setting-item">
+                                <label>
+                                    <input type="checkbox" id="setting-show-stopped" checked>
+                                    默认显示已关机的虚拟机
+                                </label>
+                            </div>
+                            <div class="setting-item">
+                                <label>
+                                    <input type="checkbox" id="setting-confirm-batch" checked>
+                                    批量操作前弹出确认对话框
+                                </label>
+                            </div>
+                            <div class="setting-item">
+                                <label>
+                                    <input type="checkbox" id="setting-natural-sort">
+                                    名称自然排序（vm1, vm2, vm10按数字大小）
+                                </label>
                             </div>
                         </div>
                         <div id="settings-tab-security" class="settings-tab-panel">

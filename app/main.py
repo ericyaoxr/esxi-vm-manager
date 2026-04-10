@@ -258,11 +258,12 @@ def api_save_config():
         if 'allowed_ips' not in data:
             data['allowed_ips'] = existing_config.get('allowed_ips', [])
 
-    required_keys = ['natural_sort', 'default_delay', 'basic_auth_enabled', 'ip_whitelist_enabled',
-                     'allowed_ips', 'api_timeout', 'scheduler_enabled', 'task_timeout', 'log_enabled']
+    required_keys = ['auto_refresh', 'default_delay', 'show_stopped', 'confirm_batch', 'natural_sort',
+                     'basic_auth_enabled', 'ip_whitelist_enabled', 'allowed_ips', 'api_timeout',
+                     'scheduler_enabled', 'task_timeout', 'log_enabled']
     for key in required_keys:
         if key not in data:
-            data[key] = False if key in ['natural_sort', 'ip_whitelist_enabled', 'basic_auth_enabled', 'scheduler_enabled', 'log_enabled'] else 0
+            data[key] = False if key in ['show_stopped', 'confirm_batch', 'natural_sort', 'ip_whitelist_enabled', 'basic_auth_enabled', 'scheduler_enabled', 'log_enabled'] else 0
 
     result = save_config(data)
     if result is True:
