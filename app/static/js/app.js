@@ -89,7 +89,7 @@ async function openSettingsModal() {
     const modal = document.getElementById('settings-modal');
     if (modal) modal.style.display = 'flex';
 
-    const result = await apiRequest('/api/config');
+    const result = await apiRequest('/config');
     if (result.success && result.config) {
         const config = result.config;
         document.getElementById('setting-auto-refresh').value = config.auto_refresh || 0;
@@ -146,7 +146,12 @@ function validateSettings() {
 }
 
 async function saveAllSettings() {
-    if (!validateSettings()) return;
+    console.log('saveAllSettings called');
+    if (!validateSettings()) {
+        console.log('Validation failed');
+        return;
+    }
+    console.log('Validation passed');
 
     const settings = {
         auto_refresh: parseInt(document.getElementById('setting-auto-refresh').value) || 0,
@@ -169,10 +174,11 @@ async function saveAllSettings() {
         settings.basic_auth_password = password;
     }
 
-    const result = await apiRequest('/api/config', {
+    const result = await apiRequest('/config', {
         method: 'POST',
         body: JSON.stringify(settings)
     });
+    console.log('Save result:', result);
 
     if (result.success) {
         showSettingsMessage('设置已保存成功！');
@@ -1424,7 +1430,7 @@ async function openSettingsModal() {
     const modal = document.getElementById('settings-modal');
     if (modal) modal.style.display = 'flex';
 
-    const result = await apiRequest('/api/config');
+    const result = await apiRequest('/config');
     if (result.success && result.config) {
         const config = result.config;
         const usernameInput = document.getElementById('setting-auth-username');
