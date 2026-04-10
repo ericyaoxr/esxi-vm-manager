@@ -5,6 +5,7 @@ import ssl
 import time
 from datetime import datetime, timedelta
 from flask import Blueprint, render_template, jsonify, request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from pyVim import connect
 from pyVmomi import vim
@@ -289,12 +290,18 @@ def api_list_vms():
     all_vms = []
     errors = []
 
-    for server in servers:
+    def fetch_vms(server):
         vms, error = get_all_vms_from_vsphere(server)
-        if error:
-            errors.append(f"{server.get('name', server.get('host'))}: {error}")
-        else:
-            all_vms.extend(vms)
+        return server, vms, error
+
+    with ThreadPoolExecutor(max_workers=min(len(servers), 5)) as executor:
+        futures = {executor.submit(fetch_vms, server): server for server in servers}
+        for future in as_completed(futures):
+            server, vms, error = future.result()
+            if error:
+                errors.append(f"{server.get('name', server.get('host'))}: {error}")
+            else:
+                all_vms.extend(vms)
 
     if not all_vms and errors:
         return jsonify({'success': False, 'error': '; '.join(errors), 'vms': []})
@@ -426,137 +433,146 @@ def api_status():
         'errors': errors if errors else None
     })
 
+def get_server_detail(server):
+    service_instance, error = connect_to_vsphere(server)
+    if error:
+        return {
+            'name': server.get('name', server.get('host')),
+            'host': server.get('host'),
+            'connected': False,
+            'error': error
+        }
+
+    try:
+        content = service_instance.RetrieveContent()
+        about = content.about
+
+        perf_manager = content.perfManager
+        host_view = content.viewManager.CreateContainerView(content.rootFolder, [vim.HostSystem], True)
+        host_system = host_view.view[0]
+
+        cpu_usage = 0
+        memory_usage = 0
+        memory_total = 0
+        memory_free = 0
+        disk_info = []
+
+        server_model = getattr(host_system.hardware.systemInfo, 'model', 'N/A')
+        server_vendor = getattr(host_system.hardware.systemInfo, 'vendor', 'N/A')
+
+        cpu_count = 0
+        cpu_cores = 0
+        cpu_total_mhz = 0
+
+        if host_system.hardware.cpuInfo:
+            cpu_count = host_system.hardware.cpuInfo.numCpuThreads
+            cpu_cores = host_system.hardware.cpuInfo.numCpuCores
+            cpu_usage = host_system.summary.quickStats.overallCpuUsage
+            cpu_speed_mhz = host_system.hardware.cpuInfo.hz / 1000000
+            cpu_total_mhz = cpu_count * cpu_speed_mhz
+            cpu_usage_percent = (cpu_usage / cpu_total_mhz * 100) if cpu_total_mhz > 0 else 0
+
+        network_info = []
+        try:
+            pnic_info = getattr(host_system.config.network, 'pnic', None)
+            if pnic_info:
+                for nic in pnic_info:
+                    speed_gbps = 0
+                    if hasattr(nic, 'linkSpeed') and nic.linkSpeed:
+                        speed_mb = getattr(nic.linkSpeed, 'speedMb', 0)
+                        speed_gbps = round(speed_mb / 1024, 1) if speed_mb else 0
+                    nic_data = {
+                        'name': getattr(nic, 'device', 'Unknown'),
+                        'mac': getattr(nic, 'mac', 'N/A'),
+                        'speed_gbps': speed_gbps,
+                        'status': 'up' if (hasattr(nic, 'linkSpeed') and nic.linkSpeed) else 'down'
+                    }
+                    network_info.append(nic_data)
+        except Exception as e:
+            write_log(f"Network info error: {str(e)}", "WARNING")
+
+        gpu_info = []
+        try:
+            devices = getattr(host_system.hardware, 'device', [])
+            for device in devices:
+                device_str = str(device)
+                if 'NVIDIA' in device_str.upper() or 'GPU' in device_str.upper() or 'VGA' in device_str.upper():
+                    gpu_info.append({
+                        'name': getattr(device, 'name', str(device)),
+                        'vendor': getattr(device, 'vendorName', 'Unknown'),
+                        'model': getattr(device, 'name', str(device)),
+                        'vram': 0,
+                        'driver_version': getattr(device, 'driverVersion', 'N/A')
+                    })
+        except Exception as e:
+            pass
+
+        if host_system.hardware.memorySize:
+            memory_total = host_system.hardware.memorySize / (1024**3)
+            memory_usage = host_system.summary.quickStats.overallMemoryUsage * 1024 * 1024 / (1024**3)
+            memory_free = memory_total - memory_usage
+            memory_usage_percent = (memory_usage / memory_total * 100) if memory_total > 0 else 0
+
+        for datastore in host_system.datastore:
+            try:
+                capacity = getattr(datastore.summary, 'capacity', 0)
+                free_space = getattr(datastore.summary, 'freeSpace', 0)
+                if capacity > 0:
+                    disk_info.append({
+                        'name': datastore.name,
+                        'capacity': capacity / (1024**3),
+                        'free': free_space / (1024**3),
+                        'usage_percent': ((capacity - free_space) / capacity * 100) if capacity > 0 else 0
+                    })
+            except:
+                pass
+
+        result = {
+            'name': server.get('name', about.name),
+            'host': server.get('host'),
+            'remark': server.get('remark', ''),
+            'connected': True,
+            'vendor': about.vendor,
+            'version': about.version,
+            'build': about.build,
+            'model': server_model,
+            'server_vendor': server_vendor,
+            'cpu': {
+                'count': cpu_count,
+                'cores': cpu_cores,
+                'usage_percent': round(cpu_usage_percent, 1),
+                'usage_ghz': round(cpu_usage / 1000, 2),
+                'total_ghz': round(cpu_total_mhz / 1000, 2)
+            },
+            'memory': {
+                'total': round(memory_total, 1),
+                'usage': round(memory_usage, 1),
+                'free': round(memory_free, 1),
+                'usage_percent': round(memory_usage_percent, 1)
+            },
+            'disks': disk_info,
+            'vm_count': len(content.viewManager.CreateContainerView(content.rootFolder, [vim.VirtualMachine], True).view)
+        }
+
+        connect.Disconnect(service_instance)
+        return result
+    except Exception as e:
+        return {
+            'name': server.get('name', server.get('host')),
+            'host': server.get('host'),
+            'connected': False,
+            'error': str(e)
+        }
+
 @main_bp.route('/api/servers/detail', methods=['GET'])
 def api_servers_detail():
     servers = load_servers()
     detailed_servers = []
 
-    for server in servers:
-        service_instance, error = connect_to_vsphere(server)
-        if error:
-            detailed_servers.append({
-                'name': server.get('name', server.get('host')),
-                'host': server.get('host'),
-                'connected': False,
-                'error': error
-            })
-            continue
-
-        try:
-            content = service_instance.RetrieveContent()
-            about = content.about
-
-            perf_manager = content.perfManager
-            host_view = content.viewManager.CreateContainerView(content.rootFolder, [vim.HostSystem], True)
-            host_system = host_view.view[0]
-
-            cpu_usage = 0
-            memory_usage = 0
-            memory_total = 0
-            memory_free = 0
-            disk_info = []
-
-            server_model = getattr(host_system.hardware.systemInfo, 'model', 'N/A')
-            server_vendor = getattr(host_system.hardware.systemInfo, 'vendor', 'N/A')
-
-            if host_system.hardware.cpuInfo:
-                cpu_count = host_system.hardware.cpuInfo.numCpuThreads
-                cpu_cores = host_system.hardware.cpuInfo.numCpuCores
-                cpu_usage = host_system.summary.quickStats.overallCpuUsage
-                cpu_speed_mhz = host_system.hardware.cpuInfo.hz / 1000000
-                cpu_total_mhz = cpu_count * cpu_speed_mhz
-                cpu_usage_percent = (cpu_usage / cpu_total_mhz * 100) if cpu_total_mhz > 0 else 0
-
-            network_info = []
-            try:
-                pnic_info = getattr(host_system.config.network, 'pnic', None)
-                if pnic_info:
-                    for nic in pnic_info:
-                        speed_gbps = 0
-                        if hasattr(nic, 'linkSpeed') and nic.linkSpeed:
-                            speed_mb = getattr(nic.linkSpeed, 'speedMb', 0)
-                            speed_gbps = round(speed_mb / 1024, 1) if speed_mb else 0
-                        nic_data = {
-                            'name': getattr(nic, 'device', 'Unknown'),
-                            'mac': getattr(nic, 'mac', 'N/A'),
-                            'speed_gbps': speed_gbps,
-                            'status': 'up' if (hasattr(nic, 'linkSpeed') and nic.linkSpeed) else 'down'
-                        }
-                        network_info.append(nic_data)
-            except Exception as e:
-                write_log(f"Network info error: {str(e)}", "WARNING")
-
-            gpu_info = []
-            try:
-                devices = getattr(host_system.hardware, 'device', [])
-                for device in devices:
-                    device_str = str(device)
-                    if 'NVIDIA' in device_str.upper() or 'GPU' in device_str.upper() or 'VGA' in device_str.upper():
-                        gpu_info.append({
-                            'name': getattr(device, 'name', str(device)),
-                            'vendor': getattr(device, 'vendorName', 'Unknown'),
-                            'model': getattr(device, 'name', str(device)),
-                            'vram': 0,
-                            'driver_version': getattr(device, 'driverVersion', 'N/A')
-                        })
-            except Exception as e:
-                pass
-
-            if host_system.hardware.memorySize:
-                memory_total = host_system.hardware.memorySize / (1024**3)
-                memory_usage = host_system.summary.quickStats.overallMemoryUsage * 1024 * 1024 / (1024**3)
-                memory_free = memory_total - memory_usage
-                memory_usage_percent = (memory_usage / memory_total * 100) if memory_total > 0 else 0
-
-            for datastore in host_system.datastore:
-                try:
-                    capacity = getattr(datastore.summary, 'capacity', 0)
-                    free_space = getattr(datastore.summary, 'freeSpace', 0)
-                    if capacity > 0:
-                        disk_info.append({
-                            'name': datastore.name,
-                            'capacity': capacity / (1024**3),
-                            'free': free_space / (1024**3),
-                            'usage_percent': ((capacity - free_space) / capacity * 100) if capacity > 0 else 0
-                        })
-                except:
-                    pass
-
-            detailed_servers.append({
-                'name': server.get('name', about.name),
-                'host': server.get('host'),
-                'remark': server.get('remark', ''),
-                'connected': True,
-                'vendor': about.vendor,
-                'version': about.version,
-                'build': about.build,
-                'model': server_model,
-                'server_vendor': server_vendor,
-                'cpu': {
-                    'count': cpu_count if host_system.hardware.cpuInfo else 0,
-                    'cores': cpu_cores if host_system.hardware.cpuInfo else 0,
-                    'usage_percent': round(cpu_usage_percent, 1),
-                    'usage_ghz': round(cpu_usage / 1000, 2),
-                    'total_ghz': round(cpu_total_mhz / 1000, 2)
-                },
-                'memory': {
-                    'total': round(memory_total, 1),
-                    'usage': round(memory_usage, 1),
-                    'free': round(memory_free, 1),
-                    'usage_percent': round(memory_usage_percent, 1)
-                },
-                'disks': disk_info,
-                'vm_count': len(content.viewManager.CreateContainerView(content.rootFolder, [vim.VirtualMachine], True).view)
-            })
-
-            connect.Disconnect(service_instance)
-        except Exception as e:
-            detailed_servers.append({
-                'name': server.get('name', server.get('host')),
-                'host': server.get('host'),
-                'connected': False,
-                'error': str(e)
-            })
+    with ThreadPoolExecutor(max_workers=min(len(servers), 5)) as executor:
+        futures = [executor.submit(get_server_detail, server) for server in servers]
+        for future in as_completed(futures):
+            detailed_servers.append(future.result())
 
     return jsonify({'success': True, 'servers': detailed_servers})
 

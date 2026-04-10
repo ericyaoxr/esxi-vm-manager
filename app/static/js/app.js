@@ -77,18 +77,24 @@ async function apiRequest(endpoint, options = {}) {
 
 let loadingCount = 0;
 let loadingTimer = null;
+let loadingStartTime = 0;
+const LOADING_MIN_DELAY = 300;
+
 function showLoading(text = '加载中...') {
+    if (loadingCount === 0) {
+        loadingStartTime = Date.now();
+    }
     loadingCount++;
     if (loadingTimer) {
         clearTimeout(loadingTimer);
         loadingTimer = null;
     }
-    const overlay = document.getElementById('loading-overlay');
-    const textEl = overlay?.querySelector('.loading-text');
-    if (textEl) textEl.textContent = text;
-    if (overlay && !overlay.classList.contains('active')) {
-        overlay.classList.add('active');
-    }
+    loadingTimer = setTimeout(() => {
+        const overlay = document.getElementById('loading-overlay');
+        const textEl = overlay?.querySelector('.loading-text');
+        if (textEl) textEl.textContent = text;
+        if (overlay) overlay.classList.add('active');
+    }, LOADING_MIN_DELAY);
 }
 
 function hideLoading() {
@@ -96,8 +102,20 @@ function hideLoading() {
         loadingCount--;
     }
     if (loadingCount === 0) {
-        const overlay = document.getElementById('loading-overlay');
-        if (overlay) overlay.classList.remove('active');
+        if (loadingTimer) {
+            clearTimeout(loadingTimer);
+            loadingTimer = null;
+        }
+        const elapsed = Date.now() - loadingStartTime;
+        if (elapsed < 1000) {
+            const overlay = document.getElementById('loading-overlay');
+            if (overlay) overlay.classList.remove('active');
+        } else {
+            setTimeout(() => {
+                const overlay = document.getElementById('loading-overlay');
+                if (overlay) overlay.classList.remove('active');
+            }, 200);
+        }
     }
 }
 
