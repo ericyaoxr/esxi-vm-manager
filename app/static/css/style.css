@@ -135,12 +135,9 @@ header h1 {
 .connection-status {
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 0.9rem;
-    padding: 6px 12px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 20px;
-    margin-right: 12px;
+    gap: 6px;
+    font-size: 0.8rem;
+    opacity: 0.85;
 }
 
 .status-dot {
