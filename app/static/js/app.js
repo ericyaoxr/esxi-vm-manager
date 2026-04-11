@@ -355,18 +355,7 @@ async function loadServers() {
             const sortFunc = naturalSort
                 ? (a, b) => naturalSortCompare(a.host, b.host)
                 : (a, b) => a.host.localeCompare(b.host);
-            let allServers = (result.servers || []).sort(sortFunc);
-            const filterHosts = (window.appConfig && window.appConfig.filter_hosts) || [];
-            if (filterHosts.length > 0) {
-                allServers = allServers.filter(server => {
-                    const serverHost = (server.host || '').toLowerCase();
-                    const serverName = (server.name || '').toLowerCase();
-                    return !filterHosts.some(filter =>
-                        serverHost.includes(filter.toLowerCase()) || serverName.includes(filter.toLowerCase())
-                    );
-                });
-            }
-            servers = allServers;
+            servers = (result.servers || []).sort(sortFunc);
         }
     } catch (e) {
         console.error('加载服务器失败:', e);
@@ -414,17 +403,7 @@ function renderServerDetail(result) {
     }
 
     try {
-        const filterHosts = (window.appConfig && window.appConfig.filter_hosts) || [];
-        let servers = result.servers;
-        if (filterHosts.length > 0) {
-            servers = servers.filter(server => {
-                const serverHost = (server.host || '').toLowerCase();
-                const serverName = (server.name || '').toLowerCase();
-                return !filterHosts.some(filter =>
-                    serverHost.includes(filter.toLowerCase()) || serverName.includes(filter.toLowerCase())
-                );
-            });
-        }
+        const servers = result.servers;
 
         if (servers.length === 0) {
             serverListDiv.innerHTML = '<p class="text-muted">暂无服务器信息</p>';
