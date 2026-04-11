@@ -18,6 +18,7 @@ let isProcessing = false;
 let serverDetailCache = null;
 let serverDetailCacheTime = 0;
 const SERVER_DETAIL_CACHE_DURATION = 30000;
+window.appConfig = {};
 
 function naturalSortCompare(a, b) {
     const numPattern = /(\d+)/g;
@@ -58,11 +59,65 @@ async function loadSettings() {
         if (result.success && result.settings) {
             currentDelay = result.settings.delay || 30;
             naturalSort = result.settings.naturalSort || false;
+            window.appConfig = {
+                ...window.appConfig,
+                ...result.settings
+            };
             updateDelayDisplay();
             updateNaturalSortDisplay();
         }
     } catch (e) {
         console.warn('加载设置失败:', e);
+    }
+}
+
+async function loadSettingsForPage() {
+    try {
+        const result = await apiRequest('/settings');
+        if (result.success && result.settings) {
+            const config = result.settings;
+            window.appConfig = config;
+            document.getElementById('setting-natural-sort').checked = config.naturalSort || false;
+            document.getElementById('setting-filter-hosts').value = (config.filter_hosts || []).join('\n');
+        }
+    } catch (e) {
+        console.warn('加载设置失败:', e);
+    }
+}
+
+function switchSettingsTab(tabName) {
+    document.querySelectorAll('.settings-tab').forEach(tab => tab.classList.remove('active'));
+    document.querySelectorAll('.settings-tab-panel').forEach(panel => panel.classList.remove('active'));
+    const tab = document.querySelector(`.settings-tab[data-tab="${tabName}"]`);
+    const panel = document.getElementById(`settings-tab-${tabName}`);
+    if (tab) tab.classList.add('active');
+    if (panel) panel.classList.add('active');
+}
+
+async function saveAllSettings() {
+    const settings = {
+        delay: currentDelay,
+        naturalSort: document.getElementById('setting-natural-sort').checked,
+        filter_hosts: document.getElementById('setting-filter-hosts').value.split('\n').map(h => h.trim()).filter(h => h)
+    };
+
+    try {
+        const result = await apiRequest('/settings', {
+            method: 'POST',
+            body: JSON.stringify(settings)
+        });
+
+        if (result.success) {
+            naturalSort = settings.naturalSort;
+            window.appConfig = settings;
+            loadServers();
+            loadVMs();
+            showToast('设置已保存', 'success');
+        } else {
+            showToast('保存失败', 'error');
+        }
+    } catch (e) {
+        showToast('保存失败: ' + e.message, 'error');
     }
 }
 
@@ -195,14 +250,27 @@ async function checkConnection() {
         const result = await apiRequest('/status');
         const indicator = document.getElementById('connection-indicator');
         const text = document.getElementById('connection-text');
+        const detail = document.getElementById('connection-detail');
 
         if (result.connected) {
             indicator.className = 'status-dot connected';
             const serverCount = result.servers ? result.servers.length : 0;
-            text.textContent = `已连接 ${serverCount} 台服务器`;
+            text.textContent = `已连接`;
+            let vmCount = 0;
+            let runningCount = 0;
+            if (result.servers) {
+                result.servers.forEach(s => {
+                    if (s.vms) {
+                        vmCount += s.vms.length;
+                        runningCount += s.vms.filter(v => v.state === 'poweredOn').length;
+                    }
+                });
+            }
+            if (detail) detail.textContent = `${serverCount}服务器 / ${runningCount}/${vmCount}运行中`;
         } else {
             indicator.className = 'status-dot disconnected';
             text.textContent = '未连接';
+            if (detail) detail.textContent = '';
         }
         return result.connected;
     } catch (e) {
@@ -449,10 +517,20 @@ async function loadVMs() {
         const vmOverviewDiv = document.getElementById('vm-overview');
 
         if (result.success && result.vms) {
+            const filterHosts = (window.appConfig && window.appConfig.filter_hosts) || [];
+            let filteredVMs = result.vms;
+            if (filterHosts.length > 0) {
+                filteredVMs = result.vms.filter(vm => {
+                    return !filterHosts.some(filter =>
+                        vm.server_host.includes(filter) || (vm.server && vm.server.includes(filter))
+                    );
+                });
+            }
+
             const sortFunc = naturalSort
                 ? (a, b) => naturalSortCompare(a.name, b.name)
                 : (a, b) => a.name.localeCompare(b.name);
-            vmData = result.vms.sort(sortFunc);
+            vmData = filteredVMs.sort(sortFunc);
 
             if (vmData.length === 0) {
                 if (vmListDiv) vmListDiv.innerHTML = '<p class="text-muted">未找到虚拟机</p>';
@@ -2108,6 +2186,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     break;
                 case 'vms':
                     loadVMs();
+                    stopLogAutoRefresh();
+                    break;
+                case 'settings':
+                    loadSettingsForPage();
                     stopLogAutoRefresh();
                     break;
                 case 'dashboard':

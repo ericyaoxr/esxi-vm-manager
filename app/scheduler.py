@@ -46,6 +46,11 @@ def init_scheduler(app):
     if _scheduler is not None:
         return _scheduler
 
+    config = get_config()
+    if not config.get('scheduler_enabled', True):
+        logger.info("Scheduler is disabled in configuration")
+        return None
+
     _scheduler = BackgroundScheduler(
         jobstores={'default': MemoryJobStore()},
         job_defaults={

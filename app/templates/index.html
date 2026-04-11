@@ -33,7 +33,6 @@
                 <span id="connection-indicator" class="status-dot"></span>
                 <span id="connection-text">检测中...</span>
             </div>
-            <button class="header-settings-btn" onclick="openSettingsModal()" title="系统设置">⚙️</button>
         </header>
 
         <nav>
@@ -43,6 +42,7 @@
             <button class="nav-btn" data-tab="scheduler">⏰ 定时任务</button>
             <button class="nav-btn" data-tab="credentials">🔑 连接配置</button>
             <button class="nav-btn" data-tab="logs">📋 日志</button>
+            <button class="nav-btn" data-tab="settings">⚙️ 系统设置</button>
         </nav>
 
         <main>
@@ -165,9 +165,72 @@
                 </div>
             </section>
 
-            <div id="settings-modal" class="modal">
-                <div class="modal-content settings-modal-content">
-                    <h3>⚙️ 系统设置</h3>
+            <section id="scheduler" class="tab-content">
+                <div class="card">
+                    <h2>⏰ 定时任务管理</h2>
+                </div>
+
+                <div class="card">
+                    <h3>➕ 新建任务</h3>
+                    <div class="task-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>任务名称</label>
+                                <input type="text" id="new-task-name" placeholder="例如: 工作日早上启动">
+                            </div>
+                            <div class="form-group">
+                                <label>执行动作</label>
+                                <select id="new-task-action">
+                                    <option value="start">▶ 启动</option>
+                                    <option value="stop">⏹ 停止</option>
+                                    <option value="suspend">⏸ 挂起</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>执行时间</label>
+                                <input type="time" id="new-task-time" value="09:00">
+                            </div>
+                            <div class="form-group">
+                                <label>执行日期</label>
+                                <div class="day-selector-inline">
+                                    <label><input type="checkbox" name="new-task-days" value="0" checked> 一</label>
+                                    <label><input type="checkbox" name="new-task-days" value="1" checked> 二</label>
+                                    <label><input type="checkbox" name="new-task-days" value="2" checked> 三</label>
+                                    <label><input type="checkbox" name="new-task-days" value="3" checked> 四</label>
+                                    <label><input type="checkbox" name="new-task-days" value="4" checked> 五</label>
+                                    <label><input type="checkbox" name="new-task-days" value="5"> 六</label>
+                                    <label><input type="checkbox" name="new-task-days" value="6"> 日</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>选择虚拟机</label>
+                            <div id="new-task-vms" class="task-vm-selector"></div>
+                        </div>
+                        <div class="form-actions">
+                            <button class="btn btn-primary" id="new-task-submit-btn" onclick="createTask()">创建任务</button>
+                            <button class="btn btn-secondary" id="new-task-cancel-btn" onclick="cancelEditTask()" style="display:none;">取消</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>📋 任务列表</h3>
+                    <div id="tasks-list">
+                        <div class="empty-state">
+                            <span class="empty-icon">⏰</span>
+                            <p class="empty-text">暂无定时任务</p>
+                            <p class="empty-hint">在下方创建新的定时任务</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="settings" class="tab-content">
+                <div class="card">
+                    <h2>⚙️ 系统设置</h2>
                     <div class="settings-tabs">
                         <button class="settings-tab active" data-tab="general" onclick="switchSettingsTab('general')">通用</button>
                         <button class="settings-tab" data-tab="security" onclick="switchSettingsTab('security')">安全</button>
@@ -206,6 +269,12 @@
                                     <input type="checkbox" id="setting-natural-sort">
                                     名称自然排序（vm1, vm2, vm10按数字大小）
                                 </label>
+                            </div>
+                            <h4>🚫 虚拟机过滤</h4>
+                            <div class="form-group">
+                                <label>过滤服务器/主机IP</label>
+                                <textarea id="setting-filter-hosts" rows="3" placeholder="每行一个，例如：&#10;192.168.1.100&#10;esxi-server"></textarea>
+                                <span class="form-hint">输入要过滤的服务器主机名或IP地址，不显示这些服务器下的虚拟机。多主机请每行填写一个。</span>
                             </div>
                         </div>
                         <div id="settings-tab-security" class="settings-tab-panel">
@@ -282,73 +351,9 @@
                         </div>
                     </div>
                     <div id="settings-message" class="settings-message" style="display:none;"></div>
-                    <div class="modal-buttons">
+                    <div class="form-actions">
                         <button class="btn btn-secondary" onclick="resetSettingsToDefaults()">恢复默认</button>
                         <button class="btn btn-primary" onclick="saveAllSettings()">保存设置</button>
-                        <button class="btn btn-primary" onclick="closeSettingsModal()">关闭</button>
-                    </div>
-                </div>
-            </div>
-
-            <section id="scheduler" class="tab-content">
-                <div class="card">
-                    <h2>⏰ 定时任务管理</h2>
-                </div>
-
-                <div class="card">
-                    <h3>➕ 新建任务</h3>
-                    <div class="task-form">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>任务名称</label>
-                                <input type="text" id="new-task-name" placeholder="例如: 工作日早上启动">
-                            </div>
-                            <div class="form-group">
-                                <label>执行动作</label>
-                                <select id="new-task-action">
-                                    <option value="start">▶ 启动</option>
-                                    <option value="stop">⏹ 停止</option>
-                                    <option value="suspend">⏸ 挂起</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>执行时间</label>
-                                <input type="time" id="new-task-time" value="09:00">
-                            </div>
-                            <div class="form-group">
-                                <label>执行日期</label>
-                                <div class="day-selector-inline">
-                                    <label><input type="checkbox" name="new-task-days" value="0" checked> 一</label>
-                                    <label><input type="checkbox" name="new-task-days" value="1" checked> 二</label>
-                                    <label><input type="checkbox" name="new-task-days" value="2" checked> 三</label>
-                                    <label><input type="checkbox" name="new-task-days" value="3" checked> 四</label>
-                                    <label><input type="checkbox" name="new-task-days" value="4" checked> 五</label>
-                                    <label><input type="checkbox" name="new-task-days" value="5"> 六</label>
-                                    <label><input type="checkbox" name="new-task-days" value="6"> 日</label>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label>选择虚拟机</label>
-                            <div id="new-task-vms" class="task-vm-selector"></div>
-                        </div>
-                        <div class="form-actions">
-                            <button class="btn btn-primary" id="new-task-submit-btn" onclick="createTask()">创建任务</button>
-                            <button class="btn btn-secondary" id="new-task-cancel-btn" onclick="cancelEditTask()" style="display:none;">取消</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <h3>📋 任务列表</h3>
-                    <div id="tasks-list">
-                        <div class="empty-state">
-                            <span class="empty-icon">⏰</span>
-                            <p class="empty-text">暂无定时任务</p>
-                            <p class="empty-hint">在下方创建新的定时任务</p>
-                        </div>
                     </div>
                 </div>
             </section>

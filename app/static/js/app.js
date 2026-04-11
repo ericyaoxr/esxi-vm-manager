@@ -54,10 +54,12 @@ function setBatchButtonsDisabled(disabled) {
 
 async function loadSettings() {
     try {
-        const result = await apiRequest('/settings');
-        if (result.success && result.settings) {
-            currentDelay = result.settings.delay || 30;
-            naturalSort = result.settings.naturalSort || false;
+        const result = await apiRequest('/config');
+        if (result.success && result.config) {
+            const config = result.config;
+            window.appConfig = config;
+            currentDelay = config.default_delay || 30;
+            naturalSort = config.natural_sort || false;
             updateDelayDisplay();
             updateNaturalSortDisplay();
         }
@@ -85,13 +87,11 @@ function switchSettingsTab(tabName) {
     document.getElementById(`settings-tab-${tabName}`).classList.add('active');
 }
 
-async function openSettingsModal() {
-    const modal = document.getElementById('settings-modal');
-    if (modal) modal.style.display = 'flex';
-
+async function loadSettingsForPage() {
     const result = await apiRequest('/config');
     if (result.success && result.config) {
         const config = result.config;
+        window.appConfig = config;
         document.getElementById('setting-auto-refresh').value = config.auto_refresh || 0;
         document.getElementById('setting-default-delay').value = config.default_delay || 0;
         document.getElementById('setting-show-stopped').checked = config.show_stopped !== false;
@@ -106,8 +106,13 @@ async function openSettingsModal() {
         document.getElementById('setting-scheduler-enabled').checked = config.scheduler_enabled !== false;
         document.getElementById('setting-task-timeout').value = config.task_timeout || 10;
         document.getElementById('setting-log-enabled').checked = config.log_enabled !== false;
+        document.getElementById('setting-filter-hosts').value = (config.filter_hosts || []).join('\n');
     }
     hideSettingsMessage();
+}
+
+async function openSettingsModal() {
+    document.querySelector('[data-tab="settings"]').click();
 }
 
 function showSettingsMessage(message, isError = false) {
@@ -166,7 +171,8 @@ async function saveAllSettings() {
         api_timeout: parseInt(document.getElementById('setting-api-timeout').value) || 30,
         scheduler_enabled: document.getElementById('setting-scheduler-enabled').checked,
         task_timeout: parseInt(document.getElementById('setting-task-timeout').value) || 10,
-        log_enabled: document.getElementById('setting-log-enabled').checked
+        log_enabled: document.getElementById('setting-log-enabled').checked,
+        filter_hosts: document.getElementById('setting-filter-hosts').value.split('\n').map(h => h.trim()).filter(h => h)
     };
 
     const password = document.getElementById('setting-auth-password').value;
@@ -184,11 +190,9 @@ async function saveAllSettings() {
         showSettingsMessage('设置已保存成功！');
         naturalSort = settings.natural_sort;
         currentDelay = settings.default_delay;
-        setTimeout(() => {
-            closeSettingsModal();
-            loadServers();
-            loadVMs();
-        }, 1000);
+        window.appConfig = settings;
+        loadServers();
+        loadVMs();
     } else {
         showSettingsMessage('保存失败: ' + (result.error || '未知错误'), true);
     }
@@ -210,6 +214,7 @@ function resetSettingsToDefaults() {
     document.getElementById('setting-scheduler-enabled').checked = true;
     document.getElementById('setting-task-timeout').value = 10;
     document.getElementById('setting-log-enabled').checked = true;
+    document.getElementById('setting-filter-hosts').value = '';
     showSettingsMessage('已恢复默认值，请点击"保存设置"以应用');
 }
 
@@ -350,7 +355,18 @@ async function loadServers() {
             const sortFunc = naturalSort
                 ? (a, b) => naturalSortCompare(a.host, b.host)
                 : (a, b) => a.host.localeCompare(b.host);
-            servers = (result.servers || []).sort(sortFunc);
+            let allServers = (result.servers || []).sort(sortFunc);
+            const filterHosts = (window.appConfig && window.appConfig.filter_hosts) || [];
+            if (filterHosts.length > 0) {
+                allServers = allServers.filter(server => {
+                    const serverHost = (server.host || '').toLowerCase();
+                    const serverName = (server.name || '').toLowerCase();
+                    return !filterHosts.some(filter =>
+                        serverHost.includes(filter.toLowerCase()) || serverName.includes(filter.toLowerCase())
+                    );
+                });
+            }
+            servers = allServers;
         }
     } catch (e) {
         console.error('加载服务器失败:', e);
@@ -398,7 +414,24 @@ function renderServerDetail(result) {
     }
 
     try {
-        const serverCards = result.servers.map(server => {
+        const filterHosts = (window.appConfig && window.appConfig.filter_hosts) || [];
+        let servers = result.servers;
+        if (filterHosts.length > 0) {
+            servers = servers.filter(server => {
+                const serverHost = (server.host || '').toLowerCase();
+                const serverName = (server.name || '').toLowerCase();
+                return !filterHosts.some(filter =>
+                    serverHost.includes(filter.toLowerCase()) || serverName.includes(filter.toLowerCase())
+                );
+            });
+        }
+
+        if (servers.length === 0) {
+            serverListDiv.innerHTML = '<p class="text-muted">暂无服务器信息</p>';
+            return;
+        }
+
+        const serverCards = servers.map(server => {
             if (!server.connected) {
                 return `
                     <div class="server-card error">
@@ -570,6 +603,20 @@ async function loadVMs() {
                 ? (a, b) => naturalSortCompare(a.name, b.name)
                 : (a, b) => a.name.localeCompare(b.name);
             vmData = result.vms.sort(sortFunc);
+
+            const filterHosts = (window.appConfig && window.appConfig.filter_hosts) || [];
+            if (filterHosts.length > 0) {
+                vmData = vmData.filter(vm => {
+                    const vmHost = (vm.server_host || '').toLowerCase();
+                    const vmServer = (vm.server || '').toLowerCase();
+                    const vmName = (vm.name || '').toLowerCase();
+                    return !filterHosts.some(filter =>
+                        vmHost.includes(filter.toLowerCase()) ||
+                        vmServer.includes(filter.toLowerCase()) ||
+                        vmName.includes(filter.toLowerCase())
+                    );
+                });
+            }
 
             if (vmData.length === 0) {
                 if (vmListDiv) vmListDiv.innerHTML = '<p class="text-muted">未找到虚拟机</p>';
@@ -2235,6 +2282,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 case 'scheduler':
                     loadTasks();
                     initSchedulerForm();
+                    stopLogAutoRefresh();
+                    break;
+                case 'settings':
+                    loadSettingsForPage();
                     stopLogAutoRefresh();
                     break;
                 case 'vms':

@@ -242,8 +242,11 @@ def api_get_config():
 @main_bp.route('/api/config', methods=['POST'])
 def api_save_config():
     data = request.json or {}
+    write_log(f"Save config - received data keys: {list(data.keys())}")
 
     existing_config = get_config()
+    write_log(f"Save config - existing config keys: {list(existing_config.keys()) if isinstance(existing_config, dict) else 'error'}")
+
     if isinstance(existing_config, dict) and 'error' not in existing_config:
         for key in existing_config:
             if key not in data:
@@ -260,14 +263,22 @@ def api_save_config():
 
     required_keys = ['auto_refresh', 'default_delay', 'show_stopped', 'confirm_batch', 'natural_sort',
                      'basic_auth_enabled', 'ip_whitelist_enabled', 'allowed_ips', 'api_timeout',
-                     'scheduler_enabled', 'task_timeout', 'log_enabled']
+                     'scheduler_enabled', 'task_timeout', 'log_enabled', 'filter_hosts']
     for key in required_keys:
         if key not in data:
-            data[key] = False if key in ['show_stopped', 'confirm_batch', 'natural_sort', 'ip_whitelist_enabled', 'basic_auth_enabled', 'scheduler_enabled', 'log_enabled'] else 0
+            if key == 'filter_hosts':
+                data[key] = []
+            elif key in ['show_stopped', 'confirm_batch', 'natural_sort', 'ip_whitelist_enabled', 'basic_auth_enabled', 'scheduler_enabled', 'log_enabled']:
+                data[key] = False
+            else:
+                data[key] = 0
 
+    write_log(f"Save config - final data to save: {data}")
     result = save_config(data)
+    write_log(f"Save config - save result: {result}")
+
     if result is True:
-        write_log("Configuration saved")
+        write_log("Configuration saved successfully")
         return jsonify({'success': True})
     return jsonify({'success': False, 'error': result})
 

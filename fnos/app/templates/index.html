@@ -32,8 +32,8 @@
             <div class="connection-status">
                 <span id="connection-indicator" class="status-dot"></span>
                 <span id="connection-text">检测中...</span>
+                <span id="connection-detail" class="connection-detail"></span>
             </div>
-            <button class="header-settings-btn" onclick="openSettingsModal()" title="系统设置">⚙️</button>
         </header>
 
         <nav>
@@ -43,6 +43,7 @@
             <button class="nav-btn" data-tab="scheduler">⏰ 定时任务</button>
             <button class="nav-btn" data-tab="credentials">🔑 连接配置</button>
             <button class="nav-btn" data-tab="logs">📋 日志</button>
+            <button class="nav-btn" data-tab="settings">⚙️ 系统设置</button>
         </nav>
 
         <main>
@@ -165,29 +166,41 @@
                 </div>
             </section>
 
-            <div id="settings-modal" class="modal">
-                <div class="modal-content">
-                    <h3>⚙️ 系统设置</h3>
-                    <div class="settings-section">
+            <section id="settings" class="tab-content">
+                <div class="settings-tabs">
+                    <button class="settings-tab active" data-tab="general" onclick="switchSettingsTab('general')">通用</button>
+                    <button class="settings-tab" data-tab="about" onclick="switchSettingsTab('about')">关于</button>
+                </div>
+                <div class="settings-content">
+                    <div id="settings-tab-general" class="settings-tab-panel active">
                         <h4>🔀 排序设置</h4>
                         <p class="settings-desc">支持名称中包含数字的自然排序（如 vm1, vm2, vm10 会按数字大小排序）</p>
                         <div class="setting-item">
                             <label>
-                                <input type="checkbox" id="setting-natural-sort" onchange="toggleNaturalSort(this.checked)">
+                                <input type="checkbox" id="setting-natural-sort">
                                 启用自然排序
                             </label>
                         </div>
+                        <h4>🚫 虚拟机过滤</h4>
+                        <div class="form-group">
+                            <label>过滤服务器/主机IP</label>
+                            <textarea id="setting-filter-hosts" rows="3" placeholder="每行一个，例如：192.168.1.100 或 esxi-server"></textarea>
+                            <span class="form-hint">输入要过滤的服务器主机名或IP地址，不显示这些服务器下的虚拟机</span>
+                        </div>
                     </div>
-                    <div class="settings-section">
-                        <h4>ℹ️ 关于系统</h4>
-                        <p>ESXi 虚拟机管理器 v1.0</p>
-                        <p class="text-muted">基于 Flask + Vue.js 构建</p>
-                    </div>
-                    <div class="modal-buttons">
-                        <button class="btn btn-primary" onclick="closeSettingsModal()">关闭</button>
+                    <div id="settings-tab-about" class="settings-tab-panel">
+                        <div class="about-section">
+                            <h4>ESXi 虚拟机管理器</h4>
+                            <p class="version">版本 1.0.0</p>
+                            <p class="tech-stack">基于 Flask + Vue.js 构建</p>
+                            <p class="copyright">© 2024-2026 Ericyaoxr</p>
+                        </div>
                     </div>
                 </div>
-            </div>
+                <div class="form-actions">
+                    <button class="btn btn-primary" onclick="saveAllSettings()">保存设置</button>
+                </div>
+            </section>
 
             <section id="scheduler" class="tab-content">
                 <div class="card">
