@@ -66,7 +66,8 @@ def save_servers(servers):
         os.makedirs(servers_dir, exist_ok=True)
         for server in servers:
             if server.get('password'):
-                server['password'] = encrypt_password(server['password'])
+                if not server['password'].startswith('gAAAAA'):
+                    server['password'] = encrypt_password(server['password'])
         with open(Config.SERVERS_PATH, 'w') as f:
             json.dump(servers, f, indent=2)
         return True
@@ -215,12 +216,15 @@ def vm_action_by_name(vm_name, action, server=None):
             pass
         return False, str(e)
 
-def wait_for_task(task):
+def wait_for_task(task, timeout=60):
+    start_time = time.time()
     while True:
         if task.info.state == vim.TaskInfo.State.success:
             return True
         elif task.info.state == vim.TaskInfo.State.error:
             return False
+        if time.time() - start_time > timeout:
+            raise TimeoutError(f"Task timeout after {timeout} seconds")
         time.sleep(0.5)
 
 @main_bp.route('/')
@@ -329,6 +333,9 @@ def api_list_vms():
     servers = load_servers()
     all_vms = []
     errors = []
+
+    if not servers:
+        return jsonify({'success': True, 'vms': [], 'errors': None})
 
     def fetch_vms(server):
         vms, error = get_all_vms_from_vsphere(server)

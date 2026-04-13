@@ -407,11 +407,40 @@ BASIC_AUTH_CREDENTIALS=admin:password123
 {
   "success": true,
   "config": {
+    "auto_refresh": 0,
+    "default_delay": 0,
+    "show_stopped": true,
+    "confirm_batch": true,
+    "natural_sort": false,
+    "filter_hosts": ["centos7-demo", "centos7-template"],
     "ip_whitelist_enabled": false,
-    "natural_sort": true
+    "allowed_ips": [],
+    "basic_auth_enabled": false,
+    "basic_auth_username": "",
+    "api_timeout": 30,
+    "scheduler_enabled": true,
+    "task_timeout": 10,
+    "log_enabled": true
   }
 }
 ```
+
+| 配置项 | 类型 | 说明 |
+|--------|------|------|
+| auto_refresh | int | 虚拟机列表自动刷新间隔（秒），0表示不刷新 |
+| default_delay | int | 批量操作默认间隔时间（秒） |
+| show_stopped | bool | 是否显示已停止的虚拟机 |
+| confirm_batch | bool | 批量操作是否需要确认 |
+| natural_sort | bool | 是否启用自然排序 |
+| filter_hosts | array | 过滤虚拟机列表（按名称/服务器/IP） |
+| ip_whitelist_enabled | bool | 是否启用IP白名单 |
+| allowed_ips | array | IP白名单列表 |
+| basic_auth_enabled | bool | 是否启用Basic认证 |
+| basic_auth_username | string | Basic认证用户名 |
+| api_timeout | int | API超时时间（秒） |
+| scheduler_enabled | bool | 是否启用定时任务 |
+| task_timeout | int | 任务超时时间（秒） |
+| log_enabled | bool | 是否启用日志 |
 
 ---
 

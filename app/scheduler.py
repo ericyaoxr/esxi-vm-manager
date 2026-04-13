@@ -99,7 +99,8 @@ def add_job_to_scheduler(task):
         trigger = CronTrigger(
             day_of_week=days,
             hour=int(cron.get('hour', 0)),
-            minute=int(cron.get('minute', 0))
+            minute=int(cron.get('minute', 0)),
+            timezone='Asia/Shanghai'
         )
     elif trigger_type == 'interval':
         interval = task.get('interval', {})
@@ -158,6 +159,7 @@ def log_task_execution(task_id, task_name, action, target_vms, results, status='
 
 def execute_task(task):
     import requests
+    import time
     from .main import Config
 
     logger.info(f"Executing scheduled task: {task['name']}")
@@ -166,13 +168,14 @@ def execute_task(task):
 
     action = task.get('action', '')
     target_vms = task.get('target_vms', [])
+    delay = task.get('delay', 0)
 
     results = {'success': 0, 'failed': 0, 'details': []}
 
     config = get_config()
     base_url = config.get('api_base_url', 'http://127.0.0.1:5000')
 
-    for vm in target_vms:
+    for i, vm in enumerate(target_vms):
         try:
             vm_name = vm['name']
             server_host = vm['server_host']
@@ -192,6 +195,9 @@ def execute_task(task):
         except Exception as e:
             results['failed'] += 1
             results['details'].append(f"{vm['name']}: {str(e)}")
+
+        if delay > 0 and i < len(target_vms) - 1:
+            time.sleep(delay)
 
     notify_result(task, results)
     log_task_execution(task_id, task_name, action, target_vms, results)

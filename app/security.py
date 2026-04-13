@@ -59,8 +59,8 @@ def is_ip_allowed(request, config):
     if is_private_ip(client_ip):
         return True, client_ip
 
-    allowed_networks = config.get('allowed_networks', [])
-    for network in allowed_networks:
+    allowed_ips = config.get('allowed_ips', [])
+    for network in allowed_ips:
         if network and network.strip():
             if ip_in_subnet(client_ip, network.strip()):
                 return True, client_ip

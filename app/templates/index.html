@@ -50,9 +50,8 @@
                 <div class="dashboard-grid">
                     <div class="card batch-section">
                         <h2>⚡ 批量操作</h2>
-                        <div class="delay-control">
-                            <label>间隔时间: <span id="delay-value">30</span>秒</label>
-                            <input type="range" id="delay-slider" min="0" max="60" value="30" step="5">
+                        <div id="batch-estimated-time" class="delay-control">
+                            <span>操作间隔: <span id="current-delay-value">30</span>秒 | 预计用时: <span id="estimated-time-value">0</span>秒</span>
                         </div>
                         <div id="batch-progress" class="batch-progress" style="display: none;">
                             <div class="progress-bar-container">
@@ -95,6 +94,11 @@
                             <span class="search-icon">🔍</span>
                             <input type="text" id="vm-search" placeholder="搜索虚拟机..." oninput="filterVMs()">
                             <button class="btn btn-sm btn-secondary" onclick="resetSearch()">✕</button>
+                        </div>
+                        <div class="vm-state-filter">
+                            <label><input type="checkbox" id="filter-poweredOn" checked onchange="filterVMs()"> 🟢 运行中</label>
+                            <label><input type="checkbox" id="filter-suspended" checked onchange="filterVMs()"> 🟡 挂起</label>
+                            <label><input type="checkbox" id="filter-poweredOff" checked onchange="filterVMs()"> 🔴 已停止</label>
                         </div>
                         <div id="vm-overview">
                             <div class="empty-state">
@@ -208,6 +212,10 @@
                         <div class="form-group">
                             <label>选择虚拟机</label>
                             <div id="new-task-vms" class="task-vm-selector"></div>
+                        </div>
+                        <div class="form-group">
+                            <label>操作间隔（秒）</label>
+                            <input type="number" id="new-task-delay" min="0" max="300" value="0" placeholder="每台虚拟机操作之间的等待时间">
                         </div>
                         <div class="form-actions">
                             <button class="btn btn-primary" id="new-task-submit-btn" onclick="createTask()">创建任务</button>
@@ -411,7 +419,7 @@
 
     <div id="add-credential-modal" class="modal">
         <div class="modal-content">
-            <h3>🖥️ 添加服务器</h3>
+            <h3 id="credential-modal-title">🖥️ 添加服务器</h3>
             <div class="form-group">
                 <label for="server-name">服务器名称:</label>
                 <input type="text" id="server-name" placeholder="例如: ESXi-主服务器">
@@ -433,8 +441,8 @@
             <div id="connection-test-result" class="connection-test-result" style="display:none;"></div>
             <div class="modal-buttons">
                 <button class="btn btn-secondary" onclick="testConnection()">🔗 测试连接</button>
-                <button class="btn btn-primary" onclick="confirmAddCredential()">添加</button>
-                <button class="btn btn-secondary" onclick="closeAddCredentialModal()">取消</button>
+                <button id="add-credential-submit-btn" class="btn btn-primary" onclick="confirmAddCredential()">添加</button>
+                <button id="add-credential-cancel-btn" class="btn btn-secondary" style="display:none;" onclick="closeAddCredentialModal()">取消</button>
             </div>
         </div>
     </div>

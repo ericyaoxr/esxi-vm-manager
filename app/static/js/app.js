@@ -62,17 +62,45 @@ async function loadSettings() {
             naturalSort = config.natural_sort || false;
             updateDelayDisplay();
             updateNaturalSortDisplay();
+            startAutoRefresh(config.auto_refresh || 0);
         }
     } catch (e) {
         console.warn('加载设置失败:', e);
     }
 }
 
+let autoRefreshTimer = null;
+let autoRefreshInterval = 0;
+
+function startAutoRefresh(intervalSeconds) {
+    stopAutoRefresh();
+    autoRefreshInterval = intervalSeconds;
+    if (intervalSeconds > 0) {
+        autoRefreshTimer = setInterval(() => {
+            refreshStatus();
+        }, intervalSeconds * 1000);
+    }
+}
+
+function stopAutoRefresh() {
+    if (autoRefreshTimer) {
+        clearInterval(autoRefreshTimer);
+        autoRefreshTimer = null;
+    }
+}
+
 function updateDelayDisplay() {
     const delaySlider = document.getElementById('delay-slider');
     const delayValue = document.getElementById('delay-value');
+    const currentDelayDisplay = document.getElementById('current-delay-value');
     if (delaySlider) delaySlider.value = currentDelay;
     if (delayValue) delayValue.textContent = currentDelay;
+    if (currentDelayDisplay) currentDelayDisplay.textContent = currentDelay;
+    const estimatedTimeEl = document.getElementById('estimated-time-value');
+    if (estimatedTimeEl) {
+        const selectedList = getSelectedVMList();
+        estimatedTimeEl.textContent = selectedList.length > 0 ? (selectedList.length - 1) * currentDelay : 0;
+    }
 }
 
 function updateNaturalSortDisplay() {
@@ -191,6 +219,7 @@ async function saveAllSettings() {
         naturalSort = settings.natural_sort;
         currentDelay = settings.default_delay;
         window.appConfig = settings;
+        startAutoRefresh(settings.auto_refresh);
         loadServers();
         loadVMs();
     } else {
@@ -343,6 +372,7 @@ async function refreshStatus() {
             loadFavorites()
         ]);
         updateVMCards();
+        filterVMs();
     } finally {
         setTimeout(hideLoading, 100);
     }
@@ -660,7 +690,7 @@ function createVMCard(vm) {
     const safeServerHost = escapeHtml(vm.server_host);
 
     return `
-        <div class="vm-card ${isSelected ? 'selected' : ''} ${isPoweredOff ? 'vm-powered-off' : ''}" data-vm-name="${safeName}" data-server-host="${safeServerHost}">
+        <div class="vm-card ${isSelected ? 'selected' : ''} ${isPoweredOff ? 'vm-powered-off' : ''}" data-vm-name="${safeName}" data-server-host="${safeServerHost}" data-vm-state="${vm.state || ''}">
             <div class="vm-card-header" onclick="handleVMCardClick(event, '${safeName}', '${safeServerHost}')">
                 <input type="checkbox" class="vm-checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); toggleVMSelection('${safeName}', '${safeServerHost}')">
                 <span class="vm-name" title="${safeServer}">${safeName}</span>
@@ -727,15 +757,58 @@ function updateVMCards() {
     updateSelectedVMPreview();
 }
 
+async function updateSingleVMCard(vmName, serverHost) {
+    const result = await apiRequest(`/vm/${encodeURIComponent(vmName)}/detail?server_host=${encodeURIComponent(serverHost)}`);
+    if (result.success && result.vm) {
+        const vm = result.vm;
+        const card = document.querySelector(`.vm-card[data-vm-name="${CSS.escape(vmName)}"][data-server-host="${CSS.escape(serverHost)}"]`);
+        if (card) {
+            const stateClass = vm.state === 'poweredOn' ? 'state-on' : (vm.state === 'poweredOff' ? 'state-off' : 'state-other');
+            const stateText = {
+                'poweredOn': '运行中',
+                'poweredOff': '已停止',
+                'suspended': '已挂起'
+            }[vm.state] || '未知';
+            const canSuspend = vm.state === 'poweredOn';
+            const canStart = vm.state === 'poweredOff' || vm.state === 'suspended';
+            card.setAttribute('data-vm-state', vm.state || '');
+            card.querySelector('.vm-state').className = `vm-state ${stateClass}`;
+            card.querySelector('.vm-state').textContent = stateText;
+            card.querySelector('.vm-card-body').innerHTML = `
+                <p>服务器: ${escapeHtml(vm.server || vm.server_host)}</p>
+                <p>状态: ${stateText}</p>
+                <p>CPU: ${vm.cpu || 0} 核 | 内存: ${vm.memory || 0} GB</p>
+            `;
+            const footer = card.querySelector('.vm-card-footer');
+            footer.innerHTML = `
+                <button class="btn btn-info btn-sm" onclick="openVmDetail('${escapeHtml(vmName)}', '${escapeHtml(serverHost)}', event)">详情</button>
+                ${canSuspend ? `<button class="btn btn-warning btn-sm" onclick="suspendVM('${escapeHtml(vmName)}', '${escapeHtml(serverHost)}', event)">挂起</button>` : ''}
+                ${canStart ? `<button class="btn btn-success btn-sm" onclick="startVM('${escapeHtml(vmName)}', '${escapeHtml(serverHost)}', event)">启动</button>` : ''}
+                <button class="btn btn-secondary btn-sm" onclick="refreshStatus()">刷新</button>
+            `;
+        }
+    }
+}
+
 function filterVMs() {
     const searchInput = document.getElementById('vm-search');
     const searchTerm = searchInput.value.toLowerCase();
+    const filterPoweredOn = document.getElementById('filter-poweredOn')?.checked ?? true;
+    const filterSuspended = document.getElementById('filter-suspended')?.checked ?? true;
+    const filterPoweredOff = document.getElementById('filter-poweredOff')?.checked ?? true;
     const vmCards = document.querySelectorAll('.vm-card');
 
     vmCards.forEach(card => {
         const vmName = card.getAttribute('data-vm-name').toLowerCase();
         const serverHost = card.getAttribute('data-server-host').toLowerCase();
-        if (vmName.includes(searchTerm) || serverHost.includes(searchTerm)) {
+        const vmState = card.getAttribute('data-vm-state') || '';
+
+        const matchesSearch = vmName.includes(searchTerm) || serverHost.includes(searchTerm);
+        const matchesState = (vmState === 'poweredOn' && filterPoweredOn)
+            || (vmState === 'suspended' && filterSuspended)
+            || (vmState === 'poweredOff' && filterPoweredOff);
+
+        if (matchesSearch && matchesState) {
             card.style.display = '';
         } else {
             card.style.display = 'none';
@@ -766,6 +839,12 @@ function updateSelectedVMPreview() {
     if (countBadge) countBadge.textContent = selectedVMs.size;
 
     const selectedList = getSelectedVMList();
+    const estimatedTimeEl = document.getElementById('estimated-time-value');
+    const currentDelayEl = document.getElementById('current-delay-value');
+    if (currentDelayEl) currentDelayEl.textContent = currentDelay;
+    if (estimatedTimeEl) {
+        estimatedTimeEl.textContent = selectedList.length > 0 ? (selectedList.length - 1) * currentDelay : 0;
+    }
     const vmItems = selectedList.map(vm => {
         const safeName = escapeHtml(vm.name);
         const safeServer = escapeHtml(vm.server || vm.server_host);
@@ -1152,7 +1231,7 @@ async function suspendVM(vmName, serverHost, event) {
 
     if (result.success) {
         showToast(`虚拟机 ${vmName} 挂起成功`, 'success');
-        await refreshStatus();
+        await updateSingleVMCard(vmName, serverHost);
     } else {
         showToast(`挂起失败: ${result.error}`, 'error');
     }
@@ -1178,7 +1257,7 @@ async function startVM(vmName, serverHost, event) {
 
     if (result.success) {
         showToast(`虚拟机 ${vmName} 启动成功`, 'success');
-        await refreshStatus();
+        await updateSingleVMCard(vmName, serverHost);
     } else {
         showToast(`启动失败: ${result.error}`, 'error');
     }
@@ -1409,7 +1488,10 @@ function renderCredentialsList() {
                 <strong>${escapeHtml(server.name) || escapeHtml(server.host)}</strong>
                 <span>${escapeHtml(server.host)}</span>
             </div>
-            <button class="btn btn-danger btn-sm" onclick="deleteServer(${index})">删除</button>
+            <div class="credential-actions">
+                <button class="btn btn-primary btn-sm" onclick="editServer(${index})">编辑</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteServer(${index})">删除</button>
+            </div>
         </div>
     `).join('');
 
@@ -1427,12 +1509,19 @@ function openAddCredentialModal() {
     const testResult = document.getElementById('connection-test-result');
     if (testResult) testResult.style.display = 'none';
 
+    document.getElementById('credential-modal-title').textContent = '🖥️ 添加服务器';
+    document.getElementById('add-credential-submit-btn').textContent = '添加';
+    document.getElementById('add-credential-submit-btn').onclick = confirmAddCredential;
+    document.getElementById('add-credential-cancel-btn').style.display = 'none';
+    editingServerIndex = -1;
+
     modal.style.display = 'flex';
 }
 
 function closeAddCredentialModal() {
     const modal = document.getElementById('add-credential-modal');
     if (modal) modal.style.display = 'none';
+    editingServerIndex = -1;
 }
 
 function openWelcomeModal() {
@@ -1531,16 +1620,6 @@ async function confirmAddCredential() {
 
     const newServer = { name, host, username, password };
 
-    const checkResult = await apiRequest('/servers/check', {
-        method: 'POST',
-        body: JSON.stringify({ server: newServer })
-    });
-
-    if (!checkResult.success) {
-        showToast('连接失败: ' + checkResult.error, 'error');
-        return;
-    }
-
     servers.push(newServer);
     const result = await apiRequest('/servers', {
         method: 'POST',
@@ -1550,6 +1629,57 @@ async function confirmAddCredential() {
     if (result.success) {
         showToast('服务器已添加', 'success');
         closeAddCredentialModal();
+        renderCredentialsList();
+        await refreshStatus();
+    } else {
+        showToast('保存失败', 'error');
+    }
+}
+
+function editServer(index) {
+    const server = servers[index];
+    if (!server) return;
+
+    document.getElementById('server-name').value = server.name || '';
+    document.getElementById('server-host').value = server.host || '';
+    document.getElementById('server-username').value = server.username || '';
+    document.getElementById('server-password').value = server.password || '';
+    const testResult = document.getElementById('connection-test-result');
+    if (testResult) testResult.style.display = 'none';
+
+    document.getElementById('add-credential-modal').style.display = 'flex';
+    document.getElementById('credential-modal-title').textContent = '🖥️ 编辑服务器';
+    editingServerIndex = index;
+    document.getElementById('add-credential-submit-btn').textContent = '保存修改';
+    document.getElementById('add-credential-submit-btn').onclick = () => confirmEditCredential(index);
+    document.getElementById('add-credential-cancel-btn').style.display = 'inline-block';
+    document.getElementById('add-credential-cancel-btn').onclick = () => {
+        closeAddCredentialModal();
+        editingServerIndex = -1;
+    };
+}
+
+async function confirmEditCredential(index) {
+    const name = document.getElementById('server-name').value.trim();
+    const host = document.getElementById('server-host').value.trim();
+    const username = document.getElementById('server-username').value.trim();
+    const password = document.getElementById('server-password').value;
+
+    if (!host || !username || !password) {
+        showToast('请填写完整信息', 'error');
+        return;
+    }
+
+    servers[index] = { name, host, username, password };
+    const result = await apiRequest('/servers', {
+        method: 'POST',
+        body: JSON.stringify({ servers })
+    });
+
+    if (result.success) {
+        showToast('服务器已更新', 'success');
+        closeAddCredentialModal();
+        editingServerIndex = -1;
         renderCredentialsList();
         await refreshStatus();
     } else {
@@ -1666,6 +1796,7 @@ async function createTask() {
     const action = document.getElementById('new-task-action').value;
     const timeParts = document.getElementById('new-task-time').value.split(':');
     const selectedDays = Array.from(document.querySelectorAll('input[name="new-task-days"]:checked')).map(cb => cb.value);
+    const delay = parseInt(document.getElementById('new-task-delay').value) || 0;
     if (selectedDays.length === 0) { showToast('请选择至少一个执行日期', 'error'); return; }
 
     const task = {
@@ -1673,6 +1804,8 @@ async function createTask() {
         name: name,
         trigger_type: 'cron',
         action: action,
+        delay: delay,
+        timezone: 'Asia/Shanghai',
         cron: { hour: parseInt(timeParts[0]), minute: parseInt(timeParts[1]), day_of_week: selectedDays.join(',') },
         target_vms: Array.from(selectedTaskVMs).map(key => {
             const [n, server_host] = key.split('|');
@@ -1701,6 +1834,7 @@ function resetTaskForm() {
     document.getElementById('new-task-action').value = 'start';
     document.getElementById('new-task-time').value = '09:00';
     document.querySelectorAll('input[name="new-task-days"]').forEach((cb, i) => cb.checked = i < 5);
+    document.getElementById('new-task-delay').value = 0;
     selectedTaskVMs.clear();
     document.querySelectorAll('.task-vm-item').forEach(el => el.classList.remove('selected'));
     document.getElementById('new-task-submit-btn').textContent = '创建任务';
@@ -1743,6 +1877,8 @@ async function openEditTaskModal(taskId) {
             cb.checked = days.includes(cb.value);
         });
 
+        document.getElementById('new-task-delay').value = task.delay || 0;
+
         selectedTaskVMs.clear();
         document.querySelectorAll('.task-vm-item').forEach(el => el.classList.remove('selected'));
         if (task.target_vms && Array.isArray(task.target_vms)) {
@@ -1782,6 +1918,7 @@ async function updateTask() {
     const action = document.getElementById('new-task-action').value;
     const timeParts = document.getElementById('new-task-time').value.split(':');
     const selectedDays = Array.from(document.querySelectorAll('input[name="new-task-days"]:checked')).map(cb => cb.value);
+    const delay = parseInt(document.getElementById('new-task-delay').value) || 0;
     if (selectedDays.length === 0) { showToast('请选择至少一个执行日期', 'error'); return; }
 
     const task = {
@@ -1789,6 +1926,8 @@ async function updateTask() {
         name: name,
         trigger_type: 'cron',
         action: action,
+        delay: delay,
+        timezone: 'Asia/Shanghai',
         cron: { hour: parseInt(timeParts[0]), minute: parseInt(timeParts[1]), day_of_week: selectedDays.join(',') },
         target_vms: Array.from(selectedTaskVMs).map(key => {
             const [n, server_host] = key.split('|');
@@ -1831,12 +1970,15 @@ async function loadTasks() {
                     : days.split(',').map(d => dayNames[parseInt(d)] || d).join(',');
                 const time = `${String(task.cron?.hour || 0).padStart(2, '0')}:${String(task.cron?.minute || 0).padStart(2, '0')}`;
                 const vmNames = task.target_vms?.map(v => v.name).join(', ') || '无';
+                const delay = task.delay || 0;
+                const delayStr = delay > 0 ? ` | 间隔${delay}秒` : '';
+                const tzStr = task.timezone || 'CST';
 
                 return `
                     <div class="task-list-item ${task.enabled ? '' : 'disabled'}">
                         <div class="task-info">
                             <div class="task-title">${actionIcons[task.action]} ${task.name}</div>
-                            <div class="task-meta">⏰ ${time} | ${dayStr} | ${vmNames}</div>
+                            <div class="task-meta">⏰ ${time} ${tzStr} | ${dayStr}${delayStr} | ${vmNames}</div>
                         </div>
                         <div class="task-controls">
                             <button class="btn btn-sm btn-warning" onclick="openEditTaskModal('${task.id}')">✏️</button>
@@ -2284,6 +2426,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         delaySlider.addEventListener('input', function() {
             currentDelay = parseInt(this.value);
             delayValue.textContent = currentDelay;
+            const currentDelayDisplay = document.getElementById('current-delay-value');
+            if (currentDelayDisplay) currentDelayDisplay.textContent = currentDelay;
+            const estimatedTimeEl = document.getElementById('estimated-time-value');
+            if (estimatedTimeEl) {
+                const selectedList = getSelectedVMList();
+                estimatedTimeEl.textContent = selectedList.length > 0 ? (selectedList.length - 1) * currentDelay : 0;
+            }
         });
         delaySlider.addEventListener('change', function() {
             saveSettings();
@@ -2316,7 +2465,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     await loadSettings();
-    await refreshStatus();
+
+    checkConnection();
+    loadServerDetail();
 
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.ready.then((registration) => {

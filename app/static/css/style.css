@@ -594,7 +594,34 @@ nav {
 .vm-search-box input:focus {
     outline: none;
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.vm-state-filter {
+    margin-bottom: 16px;
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.vm-state-filter label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    padding: 6px 12px;
+    border-radius: 6px;
+    background: var(--bg-secondary);
+    transition: background 0.2s;
+}
+
+.vm-state-filter label:hover {
+    background: var(--bg-hover);
+}
+
+.vm-state-filter input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
 }
 
 .vm-grid {
