@@ -728,8 +728,9 @@ function createVMCard(vm) {
     const safeName = escapeHtml(vm.name);
     const safeServer = escapeHtml(vm.server || vm.server_host);
     const safeServerHost = escapeHtml(vm.server_host);
-    const uptimeDisplay = isRunning && vm.uptime_seconds ? `<p>运行时长: ${formatUptime(vm.uptime_seconds)}</p>` : '';
-    const bootTimeDisplay = isRunning && vm.uptime_seconds ? `<p>启动时间: ${getBootTime(vm.uptime_seconds)}</p>` : '';
+    const showUptime = (isRunning || vm.state === 'suspended') && vm.uptime_seconds;
+    const uptimeDisplay = showUptime ? `<p>运行时长: ${formatUptime(vm.uptime_seconds)}</p>` : '';
+    const bootTimeDisplay = showUptime ? `<p>启动时间: ${getBootTime(vm.uptime_seconds)}</p>` : '';
 
     return `
         <div class="vm-card ${isSelected ? 'selected' : ''} ${isPoweredOff ? 'vm-powered-off' : ''}" data-vm-name="${safeName}" data-server-host="${safeServerHost}" data-vm-state="${vm.state || ''}">
