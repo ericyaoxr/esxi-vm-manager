@@ -1,4 +1,0 @@
-#!/bin/bash
-echo "ESXi VM Manager starting..."
-cd /app
-python -m app
