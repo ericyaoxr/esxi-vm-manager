@@ -695,10 +695,6 @@ async function loadVMs(retryCount = 0, maxRetries = 3) {
                 `;
             });
             if (vmListDiv) vmListDiv.innerHTML = groupedHtml;
-        } else if (result.errors && result.errors.length > 0 && retryCount < maxRetries) {
-            write_log(`loadVMs retry ${retryCount + 1}/${maxRetries}: ${result.errors.join('; ')}`);
-            await new Promise(r => setTimeout(r, 1000));
-            return loadVMs(retryCount + 1, maxRetries);
         } else {
             const msg = result.error || (result.errors ? result.errors.join('; ') : '加载虚拟机失败');
             if (vmListDiv) vmListDiv.innerHTML = `<p class="text-muted">${msg}</p>`;
@@ -707,7 +703,7 @@ async function loadVMs(retryCount = 0, maxRetries = 3) {
     } catch (e) {
         console.error('加载虚拟机失败:', e);
         if (retryCount < maxRetries) {
-            write_log(`loadVMs exception retry ${retryCount + 1}/${maxRetries}: ${e.message}`);
+            write_log(`loadVMs retry ${retryCount + 1}/${maxRetries}: ${e.message}`);
             await new Promise(r => setTimeout(r, 1000));
             return loadVMs(retryCount + 1, maxRetries);
         }
