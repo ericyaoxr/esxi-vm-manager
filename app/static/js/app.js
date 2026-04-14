@@ -633,11 +633,15 @@ function createProgressBar(percent, label) {
     `;
 }
 
-async function loadVMs() {
+async function loadVMs(retryCount = 0, maxRetries = 3) {
+    const vmListDiv = document.getElementById('vm-list');
+    const vmOverviewDiv = document.getElementById('vm-overview');
+
+    if (vmListDiv) vmListDiv.innerHTML = '<p class="text-muted">正在加载虚拟机...</p>';
+    if (vmOverviewDiv) vmOverviewDiv.innerHTML = '<p class="text-muted">正在加载...</p>';
+
     try {
         const result = await apiRequest('/vms');
-        const vmListDiv = document.getElementById('vm-list');
-        const vmOverviewDiv = document.getElementById('vm-overview');
 
         if (result.success && result.vms) {
             const sortFunc = naturalSort
@@ -691,16 +695,23 @@ async function loadVMs() {
                 `;
             });
             if (vmListDiv) vmListDiv.innerHTML = groupedHtml;
+        } else if (result.errors && result.errors.length > 0 && retryCount < maxRetries) {
+            write_log(`loadVMs retry ${retryCount + 1}/${maxRetries}: ${result.errors.join('; ')}`);
+            await new Promise(r => setTimeout(r, 1000));
+            return loadVMs(retryCount + 1, maxRetries);
         } else {
-            const msg = result.error || '加载虚拟机失败';
+            const msg = result.error || (result.errors ? result.errors.join('; ') : '加载虚拟机失败');
             if (vmListDiv) vmListDiv.innerHTML = `<p class="text-muted">${msg}</p>`;
-            if (vmOverviewDiv) vmOverviewDiv.innerHTML = '<p class="text-muted">加载虚拟机失败</p>';
+            if (vmOverviewDiv) vmOverviewDiv.innerHTML = '<p class="text-muted">加载失败</p>';
         }
     } catch (e) {
         console.error('加载虚拟机失败:', e);
-        const vmListDiv = document.getElementById('vm-list');
-        const vmOverviewDiv = document.getElementById('vm-overview');
-        if (vmListDiv) vmListDiv.innerHTML = '<p class="text-muted">加载失败</p>';
+        if (retryCount < maxRetries) {
+            write_log(`loadVMs exception retry ${retryCount + 1}/${maxRetries}: ${e.message}`);
+            await new Promise(r => setTimeout(r, 1000));
+            return loadVMs(retryCount + 1, maxRetries);
+        }
+        if (vmListDiv) vmListDiv.innerHTML = '<p class="text-muted">加载失败，请刷新重试</p>';
         if (vmOverviewDiv) vmOverviewDiv.innerHTML = '<p class="text-muted">加载失败</p>';
     }
 }

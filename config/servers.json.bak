@@ -1,1 +1,8 @@
-[]
+[
+  {
+    "name": "vmserver-01",
+    "host": "192.168.192.206",
+    "username": "root",
+    "password": "gAAAAABp3bdSVBT1SCIUfvpxBqRIQCerpfmrzo_FdEpXaTPd1XsQJ1bjmMrVGuiB85_cHzkVCZ6JEhTJ-DtaUGOct73i-6wf_Q=="
+  }
+]

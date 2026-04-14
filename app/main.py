@@ -28,23 +28,29 @@ class ConnectionPool:
                     cls._instance._lock = threading.Lock()
         return cls._instance
 
+    def _is_connection_alive(self, si):
+        try:
+            if si and hasattr(si, 'content') and si.content:
+                about = si.content.about
+                return about is not None
+        except:
+            pass
+        return False
+
     def get_connection(self, server):
         host = server.get('host', '')
         with self._lock:
             if host in self._connections:
                 si, timestamp = self._connections[host]
-                try:
-                    if si and hasattr(si, 'content') and si.content:
-                        if time.time() - timestamp < 300:
-                            self._connections[host] = (si, time.time())
-                            return si, None
-                except:
-                    pass
+                if self._is_connection_alive(si) and time.time() - timestamp < 300:
+                    self._connections[host] = (si, time.time())
+                    return si, None
                 try:
                     connect.Disconnect(si)
                 except:
                     pass
-                del self._connections[host]
+                if host in self._connections:
+                    del self._connections[host]
 
             creds = server
             try:
@@ -58,8 +64,10 @@ class ConnectionPool:
                     pwd=password,
                     sslContext=context
                 )
-                self._connections[host] = (service_instance, time.time())
-                return service_instance, None
+                if self._is_connection_alive(service_instance):
+                    self._connections[host] = (service_instance, time.time())
+                    return service_instance, None
+                return None, "Connection failed"
             except Exception as e:
                 return None, str(e)
 
@@ -291,22 +299,38 @@ def vm_action_by_name(vm_name, action, server=None):
             if vm_obj.runtime.powerState != vim.VirtualMachinePowerState.poweredOn:
                 task = vm_obj.PowerOn()
                 wait_for_task(task)
-            result = True
+            current_state = vm_obj.runtime.powerState
+            if current_state == vim.VirtualMachinePowerState.poweredOn:
+                result = True
+            else:
+                result = False
         elif action == 'stop' or action == 'shutdown':
             if vm_obj.runtime.powerState == vim.VirtualMachinePowerState.poweredOn:
                 task = vm_obj.PowerOff()
                 wait_for_task(task)
-            result = True
+            current_state = vm_obj.runtime.powerState
+            if current_state == vim.VirtualMachinePowerState.poweredOff:
+                result = True
+            else:
+                result = False
         elif action == 'suspend':
             if vm_obj.runtime.powerState == vim.VirtualMachinePowerState.poweredOn:
                 task = vm_obj.Suspend()
                 wait_for_task(task)
-            result = True
+            current_state = vm_obj.runtime.powerState
+            if current_state == vim.VirtualMachinePowerState.suspended:
+                result = True
+            else:
+                result = False
         elif action == 'restart':
             if vm_obj.runtime.powerState == vim.VirtualMachinePowerState.poweredOn:
                 task = vm_obj.Reset()
                 wait_for_task(task)
-            result = True
+            current_state = vm_obj.runtime.powerState
+            if current_state == vim.VirtualMachinePowerState.poweredOn:
+                result = True
+            else:
+                result = False
         else:
             result = False
 
@@ -448,8 +472,8 @@ def api_list_vms():
             else:
                 all_vms.extend(vms)
 
-    if not all_vms and errors:
-        return jsonify({'success': False, 'error': '; '.join(errors), 'vms': []})
+    if not all_vms:
+        return jsonify({'success': False, 'error': '; '.join(errors) if errors else 'No VMs loaded', 'vms': []})
 
     return jsonify({'success': True, 'vms': all_vms, 'errors': errors if errors else None})
 
