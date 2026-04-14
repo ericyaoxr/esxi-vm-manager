@@ -1129,11 +1129,12 @@ select {
 
 .task-vm-item {
     padding: 4px 10px;
-    background: white;
+    background: var(--card-bg);
     border: 1px solid var(--border-color);
     border-radius: 4px;
     font-size: 0.85rem;
     cursor: pointer;
+    color: var(--text-color);
 }
 
 .task-vm-item.selected {
@@ -2294,5 +2295,21 @@ textarea {
 
     .disk-table tr:nth-child(even) td {
         background: rgba(255, 255, 255, 0.02);
+    }
+
+    .task-vm-selector {
+        background: var(--bg-color);
+        border-color: var(--border-color);
+    }
+
+    .task-vm-item {
+        background: var(--card-bg);
+        border-color: var(--border-color);
+        color: var(--text-color);
+    }
+
+    .task-vm-item.selected {
+        background: var(--primary-color);
+        color: #fff;
     }
 }
