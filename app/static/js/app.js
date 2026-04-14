@@ -2506,6 +2506,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     checkConnection();
     loadServerDetail();
     loadVMs();
+    loadFavorites();
 
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.ready.then((registration) => {
