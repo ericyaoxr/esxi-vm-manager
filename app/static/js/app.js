@@ -266,6 +266,14 @@ async function apiRequest(endpoint, options = {}) {
             if (text.startsWith('<') && text.includes('Unexpected token')) {
                 return { success: false, error: '服务器错误，请检查网络连接' };
             }
+            if (response.status === 429) {
+                try {
+                    const errJson = JSON.parse(text);
+                    return { success: false, error: errJson.error || '请求过于频繁，请稍后再试' };
+                } catch {
+                    return { success: false, error: '请求过于频繁，请稍后再试' };
+                }
+            }
             return { success: false, error: `HTTP ${response.status}: ${text}` };
         }
 
