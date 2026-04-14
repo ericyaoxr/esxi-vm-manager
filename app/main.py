@@ -272,6 +272,8 @@ def get_all_vms_from_vsphere(server=None):
 
         for vm in containerView.view:
             vm_summary = vm.summary
+            uptime = getattr(vm.runtime, 'uptimeSeconds', 0)
+            write_log(f"VM {vm.name}: state={get_vm_state_from_vm(vm)}, uptime={uptime}")
             vms.append({
                 'name': vm.name,
                 'state': get_vm_state_from_vm(vm),
@@ -280,7 +282,7 @@ def get_all_vms_from_vsphere(server=None):
                 'server_host': server.get('host', '') if server else '',
                 'cpu': vm_summary.config.numCpu,
                 'memory': int(vm_summary.config.memorySizeMB / 1024),
-                'uptime_seconds': getattr(vm.runtime, 'uptimeSeconds', 0)
+                'uptime_seconds': uptime
             })
 
     except Exception as e:

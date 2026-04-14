@@ -799,6 +799,9 @@ async function updateSingleVMCard(vmName, serverHost) {
         const vm = result.vm;
         const card = document.querySelector(`.vm-card[data-vm-name="${CSS.escape(vmName)}"][data-server-host="${CSS.escape(serverHost)}"]`);
         if (card) {
+            const isRunning = vm.state === 'poweredOn';
+            const isSuspended = vm.state === 'suspended';
+            const showUptime = (isRunning || isSuspended) && vm.uptime_seconds;
             const stateClass = vm.state === 'poweredOn' ? 'state-on' : (vm.state === 'poweredOff' ? 'state-off' : 'state-other');
             const stateText = {
                 'poweredOn': '运行中',
@@ -807,6 +810,8 @@ async function updateSingleVMCard(vmName, serverHost) {
             }[vm.state] || '未知';
             const canSuspend = vm.state === 'poweredOn';
             const canStart = vm.state === 'poweredOff' || vm.state === 'suspended';
+            const uptimeDisplay = showUptime ? `<p>运行时长: ${formatUptime(vm.uptime_seconds)}</p>` : '';
+            const bootTimeDisplay = showUptime ? `<p>启动时间: ${getBootTime(vm.uptime_seconds)}</p>` : '';
             card.setAttribute('data-vm-state', vm.state || '');
             card.querySelector('.vm-state').className = `vm-state ${stateClass}`;
             card.querySelector('.vm-state').textContent = stateText;
@@ -814,6 +819,8 @@ async function updateSingleVMCard(vmName, serverHost) {
                 <p>服务器: ${escapeHtml(vm.server || vm.server_host)}</p>
                 <p>状态: ${stateText}</p>
                 <p>CPU: ${vm.cpu || 0} 核 | 内存: ${vm.memory || 0} GB</p>
+                ${bootTimeDisplay}
+                ${uptimeDisplay}
             `;
             const footer = card.querySelector('.vm-card-footer');
             footer.innerHTML = `

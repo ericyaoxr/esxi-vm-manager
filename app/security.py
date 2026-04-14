@@ -56,15 +56,24 @@ def get_client_ip(request):
 def is_ip_allowed(request, config):
     client_ip = get_client_ip(request)
     allowed_ips = config.get('allowed_ips', [])
+    whitelist_enabled = config.get('ip_whitelist_enabled', False)
+
+    print(f"[IP白名单] 客户端IP: {client_ip}, 白名单启用: {whitelist_enabled}, 允许列表: {allowed_ips}")
+
+    if not whitelist_enabled:
+        return True, client_ip
 
     if not allowed_ips:
-        return True, client_ip
+        print(f"[IP白名单] 允许列表为空，拒绝访问")
+        return False, client_ip
 
     for network in allowed_ips:
         if network and network.strip():
             if ip_in_subnet(client_ip, network.strip()):
+                print(f"[IP白名单] IP {client_ip} 在允许的网络 {network} 中")
                 return True, client_ip
 
+    print(f"[IP白名单] IP {client_ip} 不在任何允许的网络中，拒绝访问")
     return False, client_ip
 
 ALLOWED_ESXI_NETWORKS = ['192.168.0.0/16', '10.0.0.0/8', '172.16.0.0/12', '127.0.0.1']
