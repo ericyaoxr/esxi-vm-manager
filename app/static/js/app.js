@@ -1637,8 +1637,11 @@ async function confirmAddCredential() {
     if (result.success) {
         showToast('服务器已添加', 'success');
         closeAddCredentialModal();
+        servers.push({ name, host, username, password });
         renderCredentialsList();
-        await refreshStatus();
+        checkConnection();
+        loadServerDetail(true);
+        loadVMs();
     } else {
         showToast('保存失败', 'error');
     }
@@ -1689,7 +1692,9 @@ async function confirmEditCredential(index) {
         closeAddCredentialModal();
         editingServerIndex = -1;
         renderCredentialsList();
-        await refreshStatus();
+        checkConnection();
+        loadServerDetail(true);
+        loadVMs();
     } else {
         showToast('保存失败', 'error');
     }
@@ -1705,7 +1710,9 @@ async function deleteServer(index) {
     if (result.success) {
         showToast('服务器已删除', 'success');
         renderCredentialsList();
-        await refreshStatus();
+        checkConnection();
+        loadServerDetail(true);
+        loadVMs();
     } else {
         showToast('删除失败', 'error');
     }
