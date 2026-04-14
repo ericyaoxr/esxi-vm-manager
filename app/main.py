@@ -32,17 +32,27 @@ class ConnectionPool:
         try:
             if si and hasattr(si, 'content') and si.content:
                 about = si.content.about
-                return about is not None
+                if about is not None:
+                    return True
         except:
             pass
+        return False
+
+    def _validate_connection(self, si):
+        try:
+            if si and hasattr(si, 'content'):
+                si.content.about
+                return True
+        except:
+            return False
         return False
 
     def get_connection(self, server):
         host = server.get('host', '')
         with self._lock:
             if host in self._connections:
-                si, timestamp = self._connections[host]
-                if self._is_connection_alive(si) and time.time() - timestamp < 300:
+                si, _ = self._connections[host]
+                if self._validate_connection(si):
                     self._connections[host] = (si, time.time())
                     return si, None
                 try:
