@@ -36,6 +36,92 @@
     .stat-card {
         background: var(--bg-color);
     }
+
+    .favorite-item:hover,
+    .favorite-item.active {
+        background: #312e81;
+    }
+
+    .vm-card.selected {
+        background: #312e81;
+    }
+
+    .vm-card.vm-powered-off {
+        background: var(--card-bg);
+    }
+
+    .connection-status.connected {
+        background: #064e3b;
+        color: #a7f3d0;
+    }
+
+    .connection-status.disconnected {
+        background: #7f1d1d;
+        color: #fecaca;
+    }
+
+    .toast {
+        background: var(--card-bg);
+        color: var(--text-color);
+        border: 1px solid var(--border-color);
+    }
+
+    .toast.success {
+        background: #064e3b;
+        color: #a7f3d0;
+    }
+
+    .toast.error {
+        background: #7f1d1d;
+        color: #fecaca;
+    }
+
+    .toast.warning {
+        background: #78350f;
+        color: #fde68a;
+    }
+
+    .empty-state {
+        background: var(--card-bg);
+    }
+
+    .credential-card {
+        background: var(--card-bg);
+        border-color: var(--border-color);
+    }
+
+    .server-group {
+        background: var(--card-bg);
+    }
+
+    .batch-section {
+        background: var(--card-bg);
+    }
+
+    input[type="text"],
+    input[type="password"],
+    input[type="number"],
+    input[type="email"],
+    textarea,
+    select {
+        background: var(--bg-color);
+        color: var(--text-color);
+        border-color: var(--border-color);
+    }
+
+    .nav-btn {
+        color: var(--text-muted);
+    }
+
+    .nav-btn.active {
+        background: var(--primary-color);
+        color: #fff;
+    }
+
+    .vm-state-filter select {
+        background: var(--card-bg);
+        color: var(--text-color);
+    }
 }
 
 * {

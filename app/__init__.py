@@ -20,7 +20,13 @@ def create_app():
     limiter.init_app(app)
 
     @app.before_request
-    def check_auth():
+    def load_config_and_check_auth():
+        from app.main import get_config
+        try:
+            app.config['APP_CONFIG'] = get_config()
+        except:
+            app.config['APP_CONFIG'] = {}
+
         if request.endpoint == 'main.health':
             return None
 
@@ -37,14 +43,6 @@ def create_app():
         allowed, client_ip = is_ip_allowed(request, config)
         if not allowed:
             return jsonify({'success': False, 'error': '访问被拒绝: 不允许的IP地址'}), 403
-
-    @app.before_request
-    def load_config():
-        from app.main import get_config
-        try:
-            app.config['APP_CONFIG'] = get_config()
-        except:
-            app.config['APP_CONFIG'] = {}
 
     @app.errorhandler(404)
     def not_found(e):

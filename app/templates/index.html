@@ -96,9 +96,12 @@
                             <button class="btn btn-sm btn-secondary" onclick="resetSearch()">✕</button>
                         </div>
                         <div class="vm-state-filter">
-                            <label><input type="checkbox" id="filter-poweredOn" checked onchange="filterVMs()"> 🟢 运行中</label>
-                            <label><input type="checkbox" id="filter-suspended" checked onchange="filterVMs()"> 🟡 挂起</label>
-                            <label><input type="checkbox" id="filter-poweredOff" checked onchange="filterVMs()"> 🔴 已停止</label>
+                            <select id="vm-state-select" onchange="filterVMs()">
+                                <option value="all">全部状态</option>
+                                <option value="poweredOn">🟢 运行中</option>
+                                <option value="suspended">🟡 挂起</option>
+                                <option value="poweredOff">🔴 已停止</option>
+                            </select>
                         </div>
                         <div id="vm-overview">
                             <div class="empty-state">

@@ -801,9 +801,8 @@ async function updateSingleVMCard(vmName, serverHost) {
 function filterVMs() {
     const searchInput = document.getElementById('vm-search');
     const searchTerm = searchInput.value.toLowerCase();
-    const filterPoweredOn = document.getElementById('filter-poweredOn')?.checked ?? true;
-    const filterSuspended = document.getElementById('filter-suspended')?.checked ?? true;
-    const filterPoweredOff = document.getElementById('filter-poweredOff')?.checked ?? true;
+    const stateSelect = document.getElementById('vm-state-select');
+    const selectedState = stateSelect ? stateSelect.value : 'all';
     const vmCards = document.querySelectorAll('.vm-card');
 
     vmCards.forEach(card => {
@@ -812,9 +811,7 @@ function filterVMs() {
         const vmState = card.getAttribute('data-vm-state') || '';
 
         const matchesSearch = vmName.includes(searchTerm) || serverHost.includes(searchTerm);
-        const matchesState = (vmState === 'poweredOn' && filterPoweredOn)
-            || (vmState === 'suspended' && filterSuspended)
-            || (vmState === 'poweredOff' && filterPoweredOff);
+        const matchesState = selectedState === 'all' || vmState === selectedState;
 
         if (matchesSearch && matchesState) {
             card.style.display = '';
@@ -1545,8 +1542,7 @@ function closeWelcomeModal() {
 
 function showHelp() {
     closeWelcomeModal();
-    const credentialsBtn = document.querySelector('.nav-btn[data-tab="credentials"]');
-    if (credentialsBtn) credentialsBtn.click();
+    window.open('https://github.com/ericyaoxr/esxi-vm-manager/blob/main/README.md', '_blank');
 }
 
 async function openSettingsModal() {
