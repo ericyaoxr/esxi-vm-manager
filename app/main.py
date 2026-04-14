@@ -3,6 +3,7 @@ from app.extensions import limiter
 import os
 import json
 import ssl
+import shutil
 import time
 import threading
 from datetime import datetime, timedelta
@@ -86,14 +87,30 @@ def get_config():
         with open(Config.CONFIG_PATH, 'r') as f:
             return json.load(f)
     except Exception as e:
+        backup_path = Config.CONFIG_PATH + '.bak'
+        if os.path.exists(backup_path):
+            try:
+                with open(backup_path, 'r') as f:
+                    restored = json.load(f)
+                write_log(f"Config restored from backup")
+                return restored
+            except:
+                pass
         return {"error": str(e)}
 
 def save_config(data):
     try:
         config_dir = os.path.dirname(Config.CONFIG_PATH)
         os.makedirs(config_dir, exist_ok=True)
-        with open(Config.CONFIG_PATH, 'w') as f:
+        temp_path = Config.CONFIG_PATH + '.tmp'
+        backup_path = Config.CONFIG_PATH + '.bak'
+        with open(temp_path, 'w') as f:
             json.dump(data, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        if os.path.exists(Config.CONFIG_PATH):
+            shutil.copy2(Config.CONFIG_PATH, backup_path)
+        os.replace(temp_path, Config.CONFIG_PATH)
         return True
     except Exception as e:
         return str(e)
@@ -120,6 +137,15 @@ def load_servers():
                 data = json.load(f)
                 write_log(f"Loaded {len(data)} servers")
                 return data
+        backup_path = Config.SERVERS_PATH + '.bak'
+        if os.path.exists(backup_path):
+            try:
+                with open(backup_path, 'r') as f:
+                    data = json.load(f)
+                write_log(f"Servers restored from backup")
+                return data
+            except:
+                pass
         write_log(f"Servers file not found: {Config.SERVERS_PATH}")
         return []
     except Exception as e:
@@ -135,8 +161,15 @@ def save_servers(servers):
                 if not server['password'].startswith('gAAAAA'):
                     server['password'] = encrypt_password(server['password'])
         write_log(f"Saving {len(servers)} servers to: {Config.SERVERS_PATH}")
-        with open(Config.SERVERS_PATH, 'w') as f:
+        temp_path = Config.SERVERS_PATH + '.tmp'
+        backup_path = Config.SERVERS_PATH + '.bak'
+        with open(temp_path, 'w') as f:
             json.dump(servers, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        if os.path.exists(Config.SERVERS_PATH):
+            shutil.copy2(Config.SERVERS_PATH, backup_path)
+        os.replace(temp_path, Config.SERVERS_PATH)
         write_log(f"Servers saved successfully")
         return True
     except Exception as e:

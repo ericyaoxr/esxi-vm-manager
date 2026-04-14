@@ -1,0 +1,17 @@
+{
+  "auto_refresh": 30,
+  "default_delay": 10,
+  "show_stopped": true,
+  "confirm_batch": true,
+  "natural_sort": false,
+  "basic_auth_username": "",
+  "basic_auth_enabled": false,
+  "ip_whitelist_enabled": false,
+  "allowed_ips": [],
+  "api_timeout": 30,
+  "scheduler_enabled": true,
+  "task_timeout": 10,
+  "log_enabled": true,
+  "filter_hosts": [],
+  "basic_auth_password": ""
+}
