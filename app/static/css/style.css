@@ -13,117 +13,6 @@
     --radius: 12px;
 }
 
-@media (prefers-color-scheme: dark) {
-    :root {
-        --bg-color: #111827;
-        --card-bg: #1f2937;
-        --text-color: #f3f4f6;
-        --text-muted: #9ca3af;
-        --border-color: #374151;
-        --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
-    }
-
-    .modal-content {
-        background: var(--card-bg);
-    }
-
-    .log-content {
-        background: #0d1117;
-        color: #c9d1d9;
-    }
-
-    .performance-chart,
-    .stat-card {
-        background: var(--bg-color);
-    }
-
-    .favorite-item:hover,
-    .favorite-item.active {
-        background: #312e81;
-    }
-
-    .vm-card.selected {
-        background: #312e81;
-    }
-
-    .vm-card.vm-powered-off {
-        background: var(--card-bg);
-    }
-
-    .connection-status.connected {
-        background: #064e3b;
-        color: #a7f3d0;
-    }
-
-    .connection-status.disconnected {
-        background: #7f1d1d;
-        color: #fecaca;
-    }
-
-    .toast {
-        background: var(--card-bg);
-        color: var(--text-color);
-        border: 1px solid var(--border-color);
-    }
-
-    .toast.success {
-        background: #064e3b;
-        color: #a7f3d0;
-    }
-
-    .toast.error {
-        background: #7f1d1d;
-        color: #fecaca;
-    }
-
-    .toast.warning {
-        background: #78350f;
-        color: #fde68a;
-    }
-
-    .empty-state {
-        background: var(--card-bg);
-    }
-
-    .credential-card {
-        background: var(--card-bg);
-        border-color: var(--border-color);
-    }
-
-    .server-group {
-        background: var(--card-bg);
-    }
-
-    .batch-section {
-        background: var(--card-bg);
-    }
-
-    input[type="text"],
-    input[type="password"],
-    input[type="number"],
-    input[type="email"],
-    textarea,
-    select {
-        background: var(--bg-color);
-        color: var(--text-color);
-        border-color: var(--border-color);
-    }
-
-    .nav-btn {
-        color: var(--text-muted);
-    }
-
-    .nav-btn.active {
-        background: var(--primary-color);
-        color: #fff;
-    }
-
-    .vm-state-filter select {
-        background: var(--card-bg);
-        color: var(--text-color);
-    }
-}
-
 * {
     margin: 0;
     padding: 0;
@@ -2178,5 +2067,232 @@ textarea {
 
     .vm-card:active {
         border-color: var(--primary-color);
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg-color: #111827;
+        --card-bg: #1f2937;
+        --text-color: #f3f4f6;
+        --text-muted: #9ca3af;
+        --border-color: #374151;
+        --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+    }
+
+    body {
+        background: var(--bg-color);
+        color: var(--text-color);
+    }
+
+    .card {
+        background: var(--card-bg);
+    }
+
+    .modal-content {
+        background: var(--card-bg);
+        color: var(--text-color);
+    }
+
+    .log-content {
+        background: #0d1117;
+        color: #c9d1d9;
+    }
+
+    .performance-chart,
+    .stat-card {
+        background: var(--bg-color);
+        color: var(--text-color);
+    }
+
+    .vm-card {
+        background: var(--card-bg);
+        border-color: var(--border-color);
+        color: var(--text-color);
+    }
+
+    .vm-card-header {
+        background: var(--bg-color);
+        color: var(--text-color);
+    }
+
+    .vm-card-body {
+        background: var(--card-bg);
+        color: var(--text-color);
+    }
+
+    .vm-card-body p {
+        color: var(--text-muted);
+    }
+
+    .vm-card.selected {
+        background: #312e81;
+        border-color: #4338ca;
+        color: #f3f4f6;
+    }
+
+    .vm-card.vm-powered-off {
+        background: var(--card-bg);
+        opacity: 1;
+    }
+
+    .vm-card.vm-powered-off .vm-state {
+        color: var(--danger-color);
+    }
+
+    .favorite-item:hover,
+    .favorite-item.active {
+        background: #312e81;
+        color: #f3f4f6;
+    }
+
+    .connection-status.connected {
+        background: #064e3b;
+        color: #a7f3d0;
+    }
+
+    .connection-status.disconnected {
+        background: #7f1d1d;
+        color: #fecaca;
+    }
+
+    .toast {
+        background: var(--card-bg);
+        color: var(--text-color);
+        border: 1px solid var(--border-color);
+    }
+
+    .toast.success {
+        background: #064e3b;
+        color: #a7f3d0;
+    }
+
+    .toast.error {
+        background: #7f1d1d;
+        color: #fecaca;
+    }
+
+    .toast.warning {
+        background: #78350f;
+        color: #fde68a;
+    }
+
+    .empty-state {
+        background: var(--card-bg);
+        color: var(--text-color);
+    }
+
+    .credential-card {
+        background: var(--card-bg);
+        border-color: var(--border-color);
+        color: var(--text-color);
+    }
+
+    .server-group {
+        background: var(--card-bg);
+        color: var(--text-color);
+    }
+
+    .batch-section {
+        background: var(--card-bg);
+        color: var(--text-color);
+    }
+
+    input[type="text"],
+    input[type="password"],
+    input[type="number"],
+    input[type="email"],
+    textarea,
+    select {
+        background: var(--bg-color);
+        color: var(--text-color);
+        border-color: var(--border-color);
+    }
+
+    .nav-btn {
+        color: var(--text-muted);
+    }
+
+    .nav-btn.active {
+        background: var(--primary-color);
+        color: #fff;
+    }
+
+    .vm-state-filter select {
+        background: var(--card-bg);
+        color: var(--text-color);
+    }
+
+    .disk-table th,
+    .disk-table td {
+        background: var(--card-bg);
+        color: var(--text-color);
+        border-color: var(--border-color);
+    }
+
+    .progress-bar {
+        background: var(--bg-color);
+    }
+
+    .disk-table {
+        border-color: var(--border-color);
+    }
+
+    .server-card {
+        background: var(--card-bg);
+        border-color: var(--border-color);
+        color: var(--text-color);
+    }
+
+    .server-header {
+        background: var(--bg-color);
+        color: var(--text-color);
+    }
+
+    .server-info {
+        color: var(--text-color);
+    }
+
+    .server-info p {
+        color: var(--text-color);
+    }
+
+    .server-stats {
+        background: var(--card-bg);
+        color: var(--text-color);
+    }
+
+    .stat-item {
+        background: var(--bg-color);
+        color: var(--text-color);
+    }
+
+    .progress-label {
+        color: var(--text-color);
+    }
+
+    .server-disks {
+        color: var(--text-color);
+    }
+
+    .disk-title {
+        color: var(--text-color);
+    }
+
+    header {
+        background: linear-gradient(135deg, #312e81 0%, #4c1d95 100%);
+        color: white;
+    }
+
+    .text-muted {
+        color: var(--text-muted);
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+        color: var(--text-color);
+    }
+
+    .disk-table tr:nth-child(even) td {
+        background: rgba(255, 255, 255, 0.02);
     }
 }
