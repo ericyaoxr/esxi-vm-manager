@@ -382,6 +382,50 @@ async function checkConnection() {
     }
 }
 
+async function refreshVMCard(vmName, serverHost, event) {
+    if (event) {
+        event.stopPropagation();
+    }
+    try {
+        const result = await apiRequest(`/vm/${encodeURIComponent(vmName)}?server_host=${encodeURIComponent(serverHost)}`);
+        if (result.success && result.vm) {
+            const vm = result.vm;
+            const card = document.querySelector(`.vm-card[data-vm-name="${CSS.escape(vmName)}"][data-server-host="${CSS.escape(serverHost)}"]`);
+            if (card) {
+                card.querySelector('.vm-card-body').innerHTML = `
+                    <p>服务器: ${escapeHtml(serverHost)}</p>
+                    <p>IP地址: ${vm.ip_address || 'N/A'}</p>
+                    <p>运行时长: ${vm.state === 'poweredOn' ? formatUptime(vm.uptime_seconds) : '0分钟'}</p>
+                    <p>CPU: ${vm.cpu || 0} 核 | 内存: ${vm.memory || 0} GB</p>
+                `;
+                const stateClass = vm.state ? vm.state.toLowerCase().replace(' ', '-') : 'unknown';
+                const stateText = {
+                    'poweredOn': '运行中',
+                    'poweredOff': '已停止',
+                    'suspended': '已挂起'
+                }[vm.state] || '未知';
+                const header = card.querySelector('.vm-card-header');
+                if (header) {
+                    const stateSpan = header.querySelector('.vm-state');
+                    if (stateSpan) {
+                        stateSpan.className = `vm-state ${stateClass}`;
+                        stateSpan.textContent = stateText;
+                    }
+                }
+                card.setAttribute('data-vm-state', vm.state || '');
+            }
+            for (let i = 0; i < vmData.length; i++) {
+                if (vmData[i].name === vmName && vmData[i].server_host === serverHost) {
+                    vmData[i] = { ...vmData[i], ...vm };
+                    break;
+                }
+            }
+        }
+    } catch (e) {
+        console.error('刷新虚拟机失败:', e);
+    }
+}
+
 async function refreshStatus() {
     showLoading('正在刷新...');
     try {
@@ -487,15 +531,12 @@ function renderServerDetail(result) {
                 </tr>
             `).join('');
 
-            const remark = escapeHtml(server.remark || '');
             const remarkDisplay = `<div class="server-remark-row" id="remark-row-${server.host}">
                 <strong>备注:</strong>
-                <span class="server-remark-text" id="remark-text-${server.host}" onclick="startEditRemark('${server.host}')">${remark || '暂无备注'}</span>
-                <input type="text" class="server-remark-input" id="remark-input-${server.host}" value="${remark || ''}" style="display:none;" onblur="saveRemarkBlur('${server.host}')" onkeydown="handleRemarkKeydown(event, '${server.host}')">
+                <span class="server-remark-text" id="remark-text-${server.host}" onclick="startEditRemark('${server.host}')">${server.remark || '暂无备注'}</span>
+                <input type="text" class="server-remark-input" id="remark-input-${server.host}" value="${server.remark || ''}" style="display:none;" onblur="saveRemarkBlur('${server.host}')" onkeydown="handleRemarkKeydown(event, '${server.host}')">
                 <button class="btn btn-xs btn-secondary" id="remark-btn-${server.host}" onclick="startEditRemark('${server.host}')">✏️</button>
             </div>`;
-
-            const uptimeInfo = server.uptime_seconds ? `<p><strong>运行时长:</strong> ${formatUptime(server.uptime_seconds)}</p>` : '';
 
             return `
                 <div class="server-card">
@@ -507,9 +548,10 @@ function renderServerDetail(result) {
                         <p><strong>型号:</strong> ${escapeHtml(server.model) || 'N/A'}</p>
                         <p><strong>厂商:</strong> ${escapeHtml(server.server_vendor) || 'N/A'}</p>
                         <p><strong>地址:</strong> ${server.host}</p>
+                        <p><strong>IP地址:</strong> ${server.ip_address || server.host}</p>
+                        <p><strong>运行时长:</strong> ${server.state === 'running' ? formatUptime(server.uptime_seconds) : '0分钟'}</p>
                         <p><strong>版本:</strong> ${server.version} (Build ${server.build})</p>
                         <p><strong>虚拟机:</strong> ${server.vm_count} 台</p>
-                        ${uptimeInfo}
                         ${remarkDisplay}
                     </div>
                     <div class="server-stats">
@@ -707,6 +749,7 @@ function createVMCard(vm) {
     const stateClass = vm.state ? vm.state.toLowerCase().replace(' ', '-') : 'unknown';
     const isPoweredOff = vm.state === 'poweredOff';
     const isRunning = vm.state === 'poweredOn';
+    const isSuspended = vm.state === 'suspended';
     const canSuspend = vm.state === 'poweredOn';
     const canStart = vm.state === 'poweredOff' || vm.state === 'suspended';
     const key = vm.name + '|' + vm.server_host;
@@ -719,9 +762,6 @@ function createVMCard(vm) {
     const safeName = escapeHtml(vm.name);
     const safeServer = escapeHtml(vm.server || vm.server_host);
     const safeServerHost = escapeHtml(vm.server_host);
-    const showUptime = (isRunning || vm.state === 'suspended') && vm.uptime_seconds;
-    const uptimeDisplay = showUptime ? `<p>运行时长: ${formatUptime(vm.uptime_seconds)}</p>` : '';
-    const bootTimeDisplay = showUptime ? `<p>启动时间: ${getBootTime(vm.uptime_seconds)}</p>` : '';
 
     return `
         <div class="vm-card ${isSelected ? 'selected' : ''} ${isPoweredOff ? 'vm-powered-off' : ''}" data-vm-name="${safeName}" data-server-host="${safeServerHost}" data-vm-state="${vm.state || ''}">
@@ -732,16 +772,15 @@ function createVMCard(vm) {
             </div>
             <div class="vm-card-body">
                 <p>服务器: ${safeServer}</p>
-                <p>状态: ${stateText}</p>
+                <p>IP地址: ${vm.ip_address || 'N/A'}</p>
+                <p>运行时长: ${vm.state === 'poweredOn' ? formatUptime(vm.uptime_seconds) : '0分钟'}</p>
                 <p>CPU: ${vm.cpu || 0} 核 | 内存: ${vm.memory || 0} GB</p>
-                ${bootTimeDisplay}
-                ${uptimeDisplay}
             </div>
             <div class="vm-card-footer btn-group" data-vm-name="${safeName}" data-server-host="${safeServerHost}">
                 <button class="btn btn-info btn-sm" onclick="openVmDetail('${safeName}', '${safeServerHost}', event)">详情</button>
                 ${canSuspend ? `<button class="btn btn-warning btn-sm" onclick="suspendVM('${safeName}', '${safeServerHost}', event)">挂起</button>` : ''}
                 ${canStart ? `<button class="btn btn-success btn-sm" onclick="startVM('${safeName}', '${safeServerHost}', event)">启动</button>` : ''}
-                <button class="btn btn-secondary btn-sm" onclick="refreshStatus()">刷新</button>
+                <button class="btn btn-secondary btn-sm" onclick="refreshVMCard('${safeName}', '${safeServerHost}', event)">刷新</button>
             </div>
         </div>
     `;
@@ -801,7 +840,6 @@ async function updateSingleVMCard(vmName, serverHost) {
         if (card) {
             const isRunning = vm.state === 'poweredOn';
             const isSuspended = vm.state === 'suspended';
-            const showUptime = (isRunning || isSuspended) && vm.uptime_seconds;
             const stateClass = vm.state === 'poweredOn' ? 'state-on' : (vm.state === 'poweredOff' ? 'state-off' : 'state-other');
             const stateText = {
                 'poweredOn': '运行中',
@@ -810,8 +848,6 @@ async function updateSingleVMCard(vmName, serverHost) {
             }[vm.state] || '未知';
             const canSuspend = vm.state === 'poweredOn';
             const canStart = vm.state === 'poweredOff' || vm.state === 'suspended';
-            const uptimeDisplay = showUptime ? `<p>运行时长: ${formatUptime(vm.uptime_seconds)}</p>` : '';
-            const bootTimeDisplay = showUptime ? `<p>启动时间: ${getBootTime(vm.uptime_seconds)}</p>` : '';
             card.setAttribute('data-vm-state', vm.state || '');
             card.querySelector('.vm-state').className = `vm-state ${stateClass}`;
             card.querySelector('.vm-state').textContent = stateText;
@@ -819,8 +855,6 @@ async function updateSingleVMCard(vmName, serverHost) {
                 <p>服务器: ${escapeHtml(vm.server || vm.server_host)}</p>
                 <p>状态: ${stateText}</p>
                 <p>CPU: ${vm.cpu || 0} 核 | 内存: ${vm.memory || 0} GB</p>
-                ${bootTimeDisplay}
-                ${uptimeDisplay}
             `;
             const footer = card.querySelector('.vm-card-footer');
             footer.innerHTML = `
@@ -1803,6 +1837,7 @@ function toggleLogAutoRefresh(btn) {
     } else {
         startLogAutoRefresh();
         if (btn) btn.textContent = '⏸ 停止刷新';
+        refreshLogs();
     }
 }
 
@@ -2063,16 +2098,29 @@ async function toggleTask(taskId, enabled) {
 
 async function runTaskNow(taskId) {
     try {
-        showToast('正在执行...', 'info');
+        showToast('正在启动任务...', 'info');
         const result = await apiRequest(`/scheduler/tasks/${taskId}/run`, { method: 'POST' });
         if (result.success) {
-            showToast('任务已在后台执行', 'success');
+            const task = await getTaskById(taskId);
+            openTaskExecutionModal(taskId, task?.name || '定时任务');
         } else {
             showToast('执行失败: ' + (result.error || '未知错误'), 'error');
         }
     } catch (e) {
         showToast('执行失败', 'error');
     }
+}
+
+async function getTaskById(taskId) {
+    try {
+        const result = await apiRequest('/scheduler/tasks');
+        if (result.success && result.tasks) {
+            return result.tasks.find(t => t.id === taskId);
+        }
+    } catch (e) {
+        console.error('Failed to get task:', e);
+    }
+    return null;
 }
 
 async function removeTask(taskId) {
@@ -2135,8 +2183,6 @@ function renderVmDetail(vm) {
         'suspended': '已挂起'
     }[vm.state] || vm.state;
 
-    const uptime = formatUptime(vm.uptime_seconds);
-
     const guestInfo = vm.guest || {};
     const snapshotList = vm.snapshots?.snapshots || [];
     const networkList = vm.network || [];
@@ -2167,8 +2213,8 @@ function renderVmDetail(vm) {
                     <span class="value" style="font-size: 0.8rem; word-break: break-all;">${vm.uuid || 'N/A'}</span>
                 </div>
                 <div class="vm-detail-item">
-                    <span class="label">运行时间</span>
-                    <span class="value">${uptime}</span>
+                    <span class="label">IP地址</span>
+                    <span class="value">${vm.ip_address || guestInfo.ip_address || 'N/A'}</span>
                 </div>
             </div>
         </div>
@@ -2377,6 +2423,98 @@ function openWebhookModal(taskId) {
 function closeWebhookModal() {
     const modal = document.getElementById('webhook-modal');
     if (modal) modal.style.display = 'none';
+}
+
+let currentTaskExecutionId = null;
+let taskExecutionPollInterval = null;
+
+function openTaskExecutionModal(taskId, taskName) {
+    currentTaskExecutionId = taskId;
+    const modal = document.getElementById('task-execution-modal');
+    if (!modal) return;
+
+    document.getElementById('execution-status-text').textContent = '等待执行: ' + taskName;
+    document.getElementById('execution-progress-bar').style.width = '0%';
+    document.getElementById('execution-progress-text').textContent = '0 / 0';
+    document.getElementById('execution-current-vm').textContent = '';
+    document.getElementById('execution-logs').innerHTML = '';
+
+    modal.style.display = 'flex';
+
+    pollTaskExecutionStatus();
+    if (taskExecutionPollInterval) {
+        clearInterval(taskExecutionPollInterval);
+    }
+    taskExecutionPollInterval = setInterval(pollTaskExecutionStatus, 1000);
+}
+
+function closeTaskExecutionModal() {
+    const modal = document.getElementById('task-execution-modal');
+    if (modal) modal.style.display = 'none';
+    if (taskExecutionPollInterval) {
+        clearInterval(taskExecutionPollInterval);
+        taskExecutionPollInterval = null;
+    }
+    currentTaskExecutionId = null;
+}
+
+async function pollTaskExecutionStatus() {
+    if (!currentTaskExecutionId) return;
+
+    try {
+        const result = await apiRequest(`/scheduler/status/${currentTaskExecutionId}`);
+        if (result.success && result.status) {
+            updateTaskExecutionUI(result.status);
+        }
+    } catch (e) {
+        console.error('Failed to poll task status:', e);
+    }
+}
+
+function updateTaskExecutionUI(status) {
+    const statusText = document.getElementById('execution-status-text');
+    const progressBar = document.getElementById('execution-progress-bar');
+    const progressText = document.getElementById('execution-progress-text');
+    const currentVm = document.getElementById('execution-current-vm');
+    const logsContainer = document.getElementById('execution-logs');
+
+    const statusLabels = {
+        'running': '执行中...',
+        'completed': '已完成',
+        'failed': '执行失败',
+        'paused': '已暂停'
+    };
+    statusText.textContent = statusLabels[status.status] || status.status;
+
+    if (status.total > 0) {
+        const percent = Math.round((status.current / status.total) * 100);
+        progressBar.style.width = percent + '%';
+        progressText.textContent = `${status.current} / ${status.total}`;
+    } else {
+        progressBar.style.width = '0%';
+        progressText.textContent = '0 / 0';
+    }
+
+    if (status.current_vm) {
+        currentVm.textContent = `正在处理: ${status.current_vm}`;
+    }
+
+    if (status.logs && status.logs.length > 0) {
+        logsContainer.innerHTML = status.logs.map(log => {
+            let className = 'log-entry';
+            if (log.message.includes('✅')) className += ' log-success';
+            else if (log.message.includes('❌')) className += ' log-error';
+            return `<div class="${className}"><span class="log-time">[${log.time}]</span> ${escapeHtml(log.message)}</div>`;
+        }).join('');
+        logsContainer.scrollTop = logsContainer.scrollHeight;
+    }
+
+    if (status.status === 'completed' || status.status === 'failed') {
+        if (taskExecutionPollInterval) {
+            clearInterval(taskExecutionPollInterval);
+            taskExecutionPollInterval = null;
+        }
+    }
 }
 
 async function saveWebhookConfig() {

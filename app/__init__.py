@@ -42,7 +42,35 @@ def create_app():
 
         allowed, client_ip = is_ip_allowed(request, config)
         if not allowed:
-            return jsonify({'success': False, 'error': '访问被拒绝: 不允许的IP地址'}), 403
+            if request.path.startswith('/api/'):
+                return jsonify({'success': False, 'error': '访问被拒绝: 不允许的IP地址'}), 403
+            return '''
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>访问被拒绝</title>
+                <style>
+                    body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f5f5f5; }
+                    .container { text-align: center; padding: 40px; background: white; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+                    h1 { color: #e74c3c; margin-bottom: 20px; }
+                    p { color: #666; margin: 10px 0; }
+                    .ip-info { background: #fee; padding: 15px; border-radius: 5px; margin: 20px 0; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>⛔ 访问被拒绝</h1>
+                    <p>您的 IP 地址不在允许访问的范围内</p>
+                    <div class="ip-info">
+                        <p><strong>您的 IP:</strong> ''' + client_ip + '''</p>
+                        <p><strong>原因:</strong> IP白名单限制</p>
+                    </div>
+                    <p>如有疑问，请联系管理员</p>
+                </div>
+            </body>
+            </html>
+            ''', 403
 
     @app.errorhandler(404)
     def not_found(e):

@@ -60,6 +60,10 @@ def is_ip_allowed(request, config):
 
     print(f"[IP白名单] 客户端IP: {client_ip}, 白名单启用: {whitelist_enabled}, 允许列表: {allowed_ips}")
 
+    if client_ip in ['127.0.0.1', '::1', 'localhost']:
+        print(f"[IP白名单] localhost访问，自动放行")
+        return True, client_ip
+
     if not whitelist_enabled:
         return True, client_ip
 

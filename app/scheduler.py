@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import threading
 from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -14,6 +15,68 @@ TASK_LOG_FILE = 'logs/task_executions.log'
 
 _scheduler = None
 _jobs = {}
+_task_execution_status = {}
+_status_lock = threading.Lock()
+
+def set_task_status(task_id, status):
+    logger.info(f"[状态] set_task_status called: task_id={task_id}, status={status}")
+    with _status_lock:
+        _task_execution_status[task_id] = {
+            'status': status,
+            'current': 0,
+            'total': 0,
+            'current_vm': '',
+            'results': [],
+            'start_time': datetime.now().isoformat() if status == 'running' else None,
+            'end_time': None,
+            'logs': []
+        }
+    logger.info(f"[状态] _task_execution_status now contains: {list(_task_execution_status.keys())}")
+
+def update_task_progress(task_id, current, total, current_vm=None, log_msg=None):
+    with _status_lock:
+        if task_id in _task_execution_status:
+            _task_execution_status[task_id]['current'] = current
+            _task_execution_status[task_id]['total'] = total
+            if current_vm:
+                _task_execution_status[task_id]['current_vm'] = current_vm
+            if log_msg:
+                _task_execution_status[task_id]['logs'].append({
+                    'time': datetime.now().strftime('%H:%M:%S'),
+                    'message': log_msg
+                })
+
+def add_task_result(task_id, vm_name, success, message=None):
+    with _status_lock:
+        if task_id in _task_execution_status:
+            _task_execution_status[task_id]['results'].append({
+                'vm': vm_name,
+                'success': success,
+                'message': message
+            })
+
+def finish_task_status(task_id, final_status='completed'):
+    with _status_lock:
+        if task_id in _task_execution_status:
+            _task_execution_status[task_id]['status'] = final_status
+            _task_execution_status[task_id]['end_time'] = datetime.now().isoformat()
+
+def get_task_status(task_id):
+    logger.info(f"[状态] get_task_status called: task_id={task_id}")
+    logger.info(f"[状态] _task_execution_status keys: {list(_task_execution_status.keys())}")
+    with _status_lock:
+        result = _task_execution_status.get(task_id)
+        logger.info(f"[状态] get_task_status result: {result}")
+        return result
+
+def get_all_task_statuses():
+    with _status_lock:
+        return dict(_task_execution_status)
+
+def clear_task_status(task_id):
+    with _status_lock:
+        if task_id in _task_execution_status:
+            del _task_execution_status[task_id]
 
 def get_config():
     config_path = os.environ.get('CONFIG_PATH') or os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'config.json')
@@ -162,46 +225,99 @@ def execute_task(task):
     import time
     from .main import Config
 
-    logger.info(f"Executing scheduled task: {task['name']}")
     task_id = task.get('id', 'unknown')
     task_name = task.get('name', 'unknown')
-
     action = task.get('action', '')
     target_vms = task.get('target_vms', [])
     delay = task.get('delay', 0)
+
+    logger.info(f"[调度任务] ========== execute_task 开始 ==========")
+    logger.info(f"[调度任务] 任务ID: {task_id}, 名称: {task_name}")
+    logger.info(f"[调度任务] 操作: {action}, VM数量: {len(target_vms)}, 间隔: {delay}秒")
+    for i, vm in enumerate(target_vms):
+        logger.info(f"[调度任务] VM[{i}]: {vm.get('name')} @ {vm.get('server_host')}")
+    logger.info(f"[调度任务] =================================")
+
+    logger.info(f"[调度任务] 调用 set_task_status: {task_id}")
+    set_task_status(task_id, 'running')
+    logger.info(f"[调度任务] set_task_status 完成")
+    update_task_progress(task_id, 0, len(target_vms), log_msg=f"任务开始执行: {task_name}")
+    update_task_progress(task_id, 0, len(target_vms), log_msg=f"操作类型: {action}")
+    update_task_progress(task_id, 0, len(target_vms), log_msg=f"目标虚拟机数量: {len(target_vms)}")
 
     results = {'success': 0, 'failed': 0, 'details': []}
 
     config = get_config()
     base_url = config.get('api_base_url', 'http://127.0.0.1:5000')
 
-    for i, vm in enumerate(target_vms):
-        try:
-            vm_name = vm['name']
-            server_host = vm['server_host']
+    logger.info(f"[调度任务] 开始循环处理 {len(target_vms)} 台虚拟机")
 
+    for i, vm in enumerate(target_vms):
+        vm_name = vm.get('name', 'unknown')
+        server_host = vm.get('server_host', 'unknown')
+        logger.info(f"[调度任务] 循环迭代 {i+1}: 处理 {vm_name}")
+        update_task_progress(task_id, i + 1, len(target_vms), current_vm=vm_name, log_msg=f"正在处理 [{i+1}/{len(target_vms)}]: {vm_name}")
+
+        try:
+            logger.info(f"[调度任务] 发送请求到 {base_url}/api/vm/{action}")
             response = requests.post(
                 f"{base_url}/api/vm/{action}",
                 json={'name': vm_name, 'server_host': server_host},
-                timeout=30
+                timeout=120
             )
+            logger.info(f"[调度任务] 收到响应: status={response.status_code}")
             result = response.json()
+            logger.info(f"[调度任务] 响应内容: {result}")
 
             if result.get('success'):
                 results['success'] += 1
+                add_task_result(task_id, vm_name, True, '操作成功')
+                update_task_progress(task_id, i + 1, len(target_vms), log_msg=f"✅ {vm_name}: 操作成功")
+                logger.info(f"[调度任务] {vm_name} 操作成功")
             else:
                 results['failed'] += 1
-                results['details'].append(f"{vm_name}: {result.get('error', 'Unknown error')}")
+                error_msg = result.get('error', 'Unknown error')
+                results['details'].append(f"{vm_name}: {error_msg}")
+                add_task_result(task_id, vm_name, False, error_msg)
+                update_task_progress(task_id, i + 1, len(target_vms), log_msg=f"❌ {vm_name}: {error_msg}")
+                logger.warning(f"[调度任务] {vm_name} 操作失败: {error_msg}")
+        except requests.exceptions.Timeout:
+            results['failed'] += 1
+            error_msg = '请求超时(120秒)'
+            results['details'].append(f"{vm_name}: {error_msg}")
+            add_task_result(task_id, vm_name, False, error_msg)
+            update_task_progress(task_id, i + 1, len(target_vms), log_msg=f"❌ {vm_name}: {error_msg}")
+            logger.error(f"[调度任务] {vm_name} 请求超时")
+        except requests.exceptions.ConnectionError as e:
+            results['failed'] += 1
+            error_msg = f'连接失败: {str(e)}'
+            results['details'].append(f"{vm_name}: {error_msg}")
+            add_task_result(task_id, vm_name, False, error_msg)
+            update_task_progress(task_id, i + 1, len(target_vms), log_msg=f"❌ {vm_name}: {error_msg}")
+            logger.error(f"[调度任务] {vm_name} 连接失败: {e}")
         except Exception as e:
             results['failed'] += 1
-            results['details'].append(f"{vm['name']}: {str(e)}")
+            error_msg = str(e)
+            results['details'].append(f"{vm_name}: {error_msg}")
+            add_task_result(task_id, vm_name, False, error_msg)
+            update_task_progress(task_id, i + 1, len(target_vms), log_msg=f"❌ {vm_name}: {error_msg}")
+            logger.error(f"[调度任务] {vm_name} 执行异常: {e}")
 
+        logger.info(f"[调度任务] 循环迭代 {i+1} 完成，delay={delay}")
         if delay > 0 and i < len(target_vms) - 1:
+            update_task_progress(task_id, i + 1, len(target_vms), log_msg=f"等待 {delay} 秒后执行下一台...")
+            logger.info(f"[调度任务] 等待 {delay} 秒...")
             time.sleep(delay)
+            logger.info(f"[调度任务] 等待完成")
 
+    logger.info(f"[调度任务] 循环结束，更新最终状态")
+    update_task_progress(task_id, len(target_vms), len(target_vms), log_msg=f"任务完成: 成功 {results['success']}, 失败 {results['failed']}")
+    finish_task_status(task_id, 'completed')
+    logger.info(f"[调度任务] 完成: 成功{results['success']} 失败{results['failed']}")
     notify_result(task, results)
     log_task_execution(task_id, task_name, action, target_vms, results)
 
+    logger.info(f"[调度任务] ========== execute_task 结束 ==========")
     return results
 
 def notify_result(task, results):
@@ -305,7 +421,11 @@ def get_all_jobs():
     return list(_jobs.values())
 
 def get_job(job_id):
-    return _jobs.get(job_id)
+    job = _jobs.get(job_id)
+    logger.info(f"[调度任务] get_job({job_id}): {'找到' if job else '未找到'}")
+    if job:
+        logger.info(f"[调度任务] target_vms数量: {len(job.get('target_vms', []))}")
+    return job
 
 def add_or_update_task(task):
     tasks = load_tasks()

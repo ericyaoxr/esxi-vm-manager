@@ -241,16 +241,27 @@ def get_vm_state_from_vm(vm_obj):
     }
     return state_map.get(vm_obj.runtime.powerState, 'Unknown')
 
-def calculate_uptime_seconds(host_system):
+def calculate_vm_uptime_seconds(vm_runtime):
     try:
-        boot_time = getattr(host_system.runtime, 'bootTime', None)
+        boot_time = getattr(vm_runtime, 'bootTime', None)
         if boot_time:
             from datetime import datetime, timezone
             now = datetime.now(timezone.utc)
             if boot_time.tzinfo is None:
                 boot_time = boot_time.replace(tzinfo=timezone.utc)
             delta = now - boot_time
-            return int(delta.total_seconds())
+            seconds = int(delta.total_seconds())
+            if seconds > 0:
+                return seconds
+    except:
+        pass
+    return getattr(vm_runtime, 'uptimeSeconds', 0)
+
+def calculate_uptime_seconds(host_system):
+    try:
+        uptime = getattr(host_system.summary.quickStats, 'uptime', None)
+        if uptime and uptime > 0:
+            return int(uptime)
     except:
         pass
     return 0
@@ -272,8 +283,17 @@ def get_all_vms_from_vsphere(server=None):
 
         for vm in containerView.view:
             vm_summary = vm.summary
-            uptime = getattr(vm.runtime, 'uptimeSeconds', 0)
-            write_log(f"VM {vm.name}: state={get_vm_state_from_vm(vm)}, uptime={uptime}")
+            vm_runtime = vm.runtime
+            uptime = calculate_vm_uptime_seconds(vm_runtime)
+
+            guest_info = {}
+            try:
+                if hasattr(vm, 'guest') and vm.guest:
+                    guest_info['ip_address'] = getattr(vm.guest, 'ipAddress', '') or ''
+            except:
+                guest_info['ip_address'] = ''
+
+            write_log(f"VM {vm.name}: state={get_vm_state_from_vm(vm)}, uptime={uptime}, ip={guest_info.get('ip_address', 'N/A')}")
             vms.append({
                 'name': vm.name,
                 'state': get_vm_state_from_vm(vm),
@@ -282,7 +302,8 @@ def get_all_vms_from_vsphere(server=None):
                 'server_host': server.get('host', '') if server else '',
                 'cpu': vm_summary.config.numCpu,
                 'memory': int(vm_summary.config.memorySizeMB / 1024),
-                'uptime_seconds': uptime
+                'uptime_seconds': uptime,
+                'ip_address': guest_info.get('ip_address', '')
             })
 
     except Exception as e:
@@ -293,9 +314,11 @@ def get_all_vms_from_vsphere(server=None):
 def vm_action_by_name(vm_name, action, server=None):
     service_instance, error = connect_to_vsphere(server)
     if error:
+        write_log(f"[vm_action] 连接失败: {error}", "ERROR")
         return False, error
 
     try:
+        write_log(f"[vm_action] 开始执行: {action} on {vm_name}")
         content = service_instance.RetrieveContent()
         container = content.rootFolder
         view_type = [vim.VirtualMachine]
@@ -309,53 +332,74 @@ def vm_action_by_name(vm_name, action, server=None):
                 break
 
         if not vm_obj:
+            write_log(f"[vm_action] VM {vm_name} 未找到", "ERROR")
             return False, f"VM {vm_name} not found"
+
+        current_power_state = vm_obj.runtime.powerState
+        write_log(f"[vm_action] 当前电源状态: {current_power_state}")
 
         if action == 'start':
             if vm_obj.runtime.powerState != vim.VirtualMachinePowerState.poweredOn:
+                write_log(f"[vm_action] 执行开机操作...")
                 task = vm_obj.PowerOn()
                 wait_for_task(task)
             current_state = vm_obj.runtime.powerState
             if current_state == vim.VirtualMachinePowerState.poweredOn:
                 result = True
+                write_log(f"[vm_action] 开机成功")
             else:
                 result = False
+                write_log(f"[vm_action] 开机失败，状态: {current_state}", "ERROR")
         elif action == 'stop' or action == 'shutdown':
             if vm_obj.runtime.powerState == vim.VirtualMachinePowerState.poweredOn:
+                write_log(f"[vm_action] 执行关机操作...")
                 task = vm_obj.PowerOff()
                 wait_for_task(task)
             current_state = vm_obj.runtime.powerState
             if current_state == vim.VirtualMachinePowerState.poweredOff:
                 result = True
+                write_log(f"[vm_action] 关机成功")
             else:
                 result = False
+                write_log(f"[vm_action] 关机失败，状态: {current_state}", "ERROR")
         elif action == 'suspend':
             if vm_obj.runtime.powerState == vim.VirtualMachinePowerState.poweredOn:
+                write_log(f"[vm_action] 执行挂起操作...")
                 task = vm_obj.Suspend()
                 wait_for_task(task)
             current_state = vm_obj.runtime.powerState
             if current_state == vim.VirtualMachinePowerState.suspended:
                 result = True
+                write_log(f"[vm_action] 挂起成功")
             else:
                 result = False
+                write_log(f"[vm_action] 挂起失败，状态: {current_state}", "ERROR")
         elif action == 'restart':
             if vm_obj.runtime.powerState == vim.VirtualMachinePowerState.poweredOn:
+                write_log(f"[vm_action] 执行重启操作...")
                 task = vm_obj.Reset()
                 wait_for_task(task)
             current_state = vm_obj.runtime.powerState
             if current_state == vim.VirtualMachinePowerState.poweredOn:
                 result = True
+                write_log(f"[vm_action] 重启成功")
             else:
                 result = False
+                write_log(f"[vm_action] 重启失败，状态: {current_state}", "ERROR")
         else:
             result = False
+            write_log(f"[vm_action] 未知操作: {action}", "ERROR")
 
         return result, None
 
+    except TimeoutError as e:
+        write_log(f"[vm_action] 操作超时: {str(e)}", "ERROR")
+        return False, str(e)
     except Exception as e:
+        write_log(f"[vm_action] 执行异常: {str(e)}", "ERROR")
         return False, str(e)
 
-def wait_for_task(task, timeout=60):
+def wait_for_task(task, timeout=300):
     start_time = time.time()
     while True:
         if task.info.state == vim.TaskInfo.State.success:
@@ -364,7 +408,7 @@ def wait_for_task(task, timeout=60):
             return False
         if time.time() - start_time > timeout:
             raise TimeoutError(f"Task timeout after {timeout} seconds")
-        time.sleep(0.5)
+        time.sleep(1)
 
 @main_bp.route('/')
 def index():
@@ -574,7 +618,9 @@ def api_batch_vm_action():
             results.append({'name': vm_name, 'server': server_host, 'action': 'failed', 'error': error})
             write_log(f"Failed: {action} {vm_name} - {error}", "ERROR")
 
-        if delay > 0 and vm_info != vm_list[-1]:
+        idx = vm_list.index(vm_info)
+        if delay > 0 and idx < len(vm_list) - 1:
+            write_log(f"Batch delay: waiting {delay} seconds before next VM")
             time.sleep(delay)
 
     success_count = sum(1 for r in results if r['action'] == 'success')
@@ -733,6 +779,8 @@ def get_server_detail(server):
             'build': about.build,
             'model': server_model,
             'server_vendor': server_vendor,
+            'state': 'running',
+            'ip_address': server.get('host'),
             'uptime_seconds': calculate_uptime_seconds(host_system),
             'cpu': {
                 'count': cpu_count,
@@ -893,8 +941,9 @@ def api_vm_detail(vm_name):
             'snapshots': snapshot_info,
             'vm_path': getattr(vm_config, 'vmPathName', 'N/A'),
             'annotation': getattr(vm_config, 'annotation', '') or '',
-            'uptime_seconds': getattr(vm_runtime, 'uptimeSeconds', 0),
-            'is_template': getattr(vm_runtime, 'template', False)
+            'uptime_seconds': calculate_vm_uptime_seconds(vm_runtime),
+            'is_template': getattr(vm_runtime, 'template', False),
+            'ip_address': guest_info.get('ip_address', '')
         }
 
         return jsonify({'success': True, 'vm': vm_detail})
@@ -1052,6 +1101,7 @@ def api_save_settings():
         return jsonify({'success': False, 'error': str(e)})
 
 @main_bp.route('/api/logs', methods=['GET'])
+@limiter.exempt
 def api_logs():
     log_file = os.path.join(Config.LOG_PATH, f"{datetime.now().strftime('%Y%m%d')}-web.log")
     task_log_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logs', 'task_executions.log')
@@ -1081,6 +1131,7 @@ def api_logs():
         return jsonify({'success': False, 'error': str(e)})
 
 @main_bp.route('/api/logs/clear', methods=['POST'])
+@limiter.exempt
 def api_clear_logs():
     log_file = os.path.join(Config.LOG_PATH, f"{datetime.now().strftime('%Y%m%d')}-web.log")
     task_log_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logs', 'task_executions.log')
@@ -1184,25 +1235,28 @@ def api_sync_holidays():
 
 @main_bp.route('/api/scheduler/tasks/<task_id>/run', methods=['POST'])
 def api_run_task(task_id):
-    from .scheduler import get_job
     import threading
     try:
-        task = get_job(task_id)
+        from .scheduler import load_tasks
+        tasks = load_tasks()
+        task = next((t for t in tasks if t.get('id') == task_id), None)
         if not task:
             return jsonify({'success': False, 'error': 'Task not found'})
-        
+
+        task_copy = json.loads(json.dumps(task))
+
         def run_in_background():
             from .scheduler import execute_task
             try:
-                execute_task(task)
+                execute_task(task_copy)
             except Exception as e:
                 import logging
                 logging.error(f"Background task execution failed: {e}")
-        
+
         thread = threading.Thread(target=run_in_background)
         thread.daemon = True
         thread.start()
-        
+
         return jsonify({'success': True, 'message': 'Task started in background'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
@@ -1221,6 +1275,35 @@ def api_task_webhook(task_id):
         task['notify_enabled'] = bool(task['notification_channels'])
 
         save_tasks(tasks)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@main_bp.route('/api/scheduler/status/<task_id>', methods=['GET'])
+def api_task_execution_status(task_id):
+    try:
+        from .scheduler import get_task_status
+        status = get_task_status(task_id)
+        if status is None:
+            return jsonify({'success': False, 'error': 'No execution status found'})
+        return jsonify({'success': True, 'status': status})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@main_bp.route('/api/scheduler/status/all', methods=['GET'])
+def api_all_task_execution_statuses():
+    try:
+        from .scheduler import get_all_task_statuses
+        statuses = get_all_task_statuses()
+        return jsonify({'success': True, 'statuses': statuses})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@main_bp.route('/api/scheduler/status/<task_id>', methods=['DELETE'])
+def api_clear_task_execution_status(task_id):
+    try:
+        from .scheduler import clear_task_status
+        clear_task_status(task_id)
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})

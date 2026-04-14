@@ -10,10 +10,13 @@
   "allowed_ips": [
     "172.20.28.168"
   ],
-  "api_timeout": 30,
+  "api_timeout": 60,
   "scheduler_enabled": true,
   "task_timeout": 10,
   "log_enabled": true,
-  "filter_hosts": [],
+  "filter_hosts": [
+    "172.20.28.168",
+    "172.20.28.166"
+  ],
   "basic_auth_password": ""
 }

@@ -562,6 +562,31 @@
         </div>
     </div>
 
+    <div id="task-execution-modal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>📋 任务执行进度</h3>
+                <button class="modal-close" onclick="closeTaskExecutionModal()">×</button>
+            </div>
+            <div id="task-execution-content">
+                <div class="execution-summary">
+                    <div class="execution-status">
+                        <span id="execution-status-text">等待执行</span>
+                    </div>
+                    <div class="execution-progress-container">
+                        <div id="execution-progress-bar" class="execution-progress-fill" style="width: 0%"></div>
+                    </div>
+                    <div id="execution-progress-text" class="execution-progress-text">0 / 0</div>
+                </div>
+                <div id="execution-current-vm" class="execution-current-vm"></div>
+                <div id="execution-logs" class="execution-logs"></div>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn btn-secondary" onclick="closeTaskExecutionModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+
     <div id="toast" class="toast"></div>
     <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>

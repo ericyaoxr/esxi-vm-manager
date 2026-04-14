@@ -2053,6 +2053,85 @@ textarea {
     to { transform: rotate(360deg); }
 }
 
+.execution-summary {
+    margin-bottom: 20px;
+    padding: 16px;
+    background: var(--bg-color);
+    border-radius: 8px;
+}
+
+.execution-status {
+    text-align: center;
+    margin-bottom: 12px;
+}
+
+#execution-status-text {
+    font-size: 1.1rem;
+    font-weight: bold;
+}
+
+.execution-progress-container {
+    height: 24px;
+    background: var(--bg-color);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.execution-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary-color), var(--success-color));
+    border-radius: 12px;
+    transition: width 0.3s ease;
+}
+
+.execution-progress-text {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.execution-current-vm {
+    padding: 12px;
+    background: rgba(79, 70, 229, 0.1);
+    border-left: 4px solid var(--primary-color);
+    margin-bottom: 16px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+.execution-logs {
+    max-height: 300px;
+    overflow-y: auto;
+    background: var(--bg-color);
+    border-radius: 8px;
+    padding: 12px;
+    font-family: monospace;
+    font-size: 0.85rem;
+}
+
+.execution-logs .log-entry {
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.execution-logs .log-entry:last-child {
+    border-bottom: none;
+}
+
+.execution-logs .log-time {
+    color: var(--text-muted);
+    margin-right: 8px;
+}
+
+.execution-logs .log-success {
+    color: var(--success-color);
+}
+
+.execution-logs .log-error {
+    color: var(--danger-color);
+}
+
 @media (hover: none) and (pointer: coarse) {
     .nav-btn:hover {
         transform: none;
