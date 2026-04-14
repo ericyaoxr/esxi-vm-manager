@@ -15,10 +15,11 @@ main_bp = Blueprint('main', __name__)
 
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'esxi-vm-manager-secret-key'
-    CONFIG_PATH = os.environ.get('CONFIG_PATH') or os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'config.json')
-    LOG_PATH = os.environ.get('LOG_PATH') or os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logs')
-    FAVORITES_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'favorites.json')
-    SERVERS_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'servers.json')
+    BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+    CONFIG_PATH = os.environ.get('CONFIG_PATH') or os.path.join(BASE_DIR, 'config', 'config.json')
+    LOG_PATH = os.environ.get('LOG_PATH') or os.path.join(BASE_DIR, 'logs')
+    FAVORITES_PATH = os.environ.get('FAVORITES_PATH') or os.path.join(BASE_DIR, 'config', 'favorites.json')
+    SERVERS_PATH = os.environ.get('SERVERS_PATH') or os.path.join(BASE_DIR, 'config', 'servers.json')
 
 def get_config():
     try:
@@ -54,10 +55,15 @@ def write_log(message, level="INFO"):
 def load_servers():
     try:
         if os.path.exists(Config.SERVERS_PATH):
+            write_log(f"Loading servers from: {Config.SERVERS_PATH}")
             with open(Config.SERVERS_PATH, 'r') as f:
-                return json.load(f)
+                data = json.load(f)
+                write_log(f"Loaded {len(data)} servers")
+                return data
+        write_log(f"Servers file not found: {Config.SERVERS_PATH}")
         return []
-    except:
+    except Exception as e:
+        write_log(f"Error loading servers: {e}", "ERROR")
         return []
 
 def save_servers(servers):
@@ -68,10 +74,13 @@ def save_servers(servers):
             if server.get('password'):
                 if not server['password'].startswith('gAAAAA'):
                     server['password'] = encrypt_password(server['password'])
+        write_log(f"Saving {len(servers)} servers to: {Config.SERVERS_PATH}")
         with open(Config.SERVERS_PATH, 'w') as f:
             json.dump(servers, f, indent=2)
+        write_log(f"Servers saved successfully")
         return True
     except Exception as e:
+        write_log(f"Error saving servers: {e}", "ERROR")
         return str(e)
 
 def get_favorites():
@@ -128,6 +137,20 @@ def get_vm_state_from_vm(vm_obj):
         'suspended': 'suspended'
     }
     return state_map.get(vm_obj.runtime.powerState, 'Unknown')
+
+def calculate_uptime_seconds(host_system):
+    try:
+        boot_time = getattr(host_system.runtime, 'bootTime', None)
+        if boot_time:
+            from datetime import datetime, timezone
+            now = datetime.now(timezone.utc)
+            if boot_time.tzinfo is None:
+                boot_time = boot_time.replace(tzinfo=timezone.utc)
+            delta = now - boot_time
+            return int(delta.total_seconds())
+    except:
+        pass
+    return 0
 
 def get_all_vms_from_vsphere(server=None):
     service_instance, error = connect_to_vsphere(server)
@@ -585,6 +608,7 @@ def get_server_detail(server):
             'build': about.build,
             'model': server_model,
             'server_vendor': server_vendor,
+            'uptime_seconds': calculate_uptime_seconds(host_system),
             'cpu': {
                 'count': cpu_count,
                 'cores': cpu_cores,

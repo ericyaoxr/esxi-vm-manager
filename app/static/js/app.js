@@ -504,6 +504,8 @@ function renderServerDetail(result) {
                 <button class="btn btn-xs btn-secondary" id="remark-btn-${server.host}" onclick="startEditRemark('${server.host}')">✏️</button>
             </div>`;
 
+            const uptimeInfo = server.uptime_seconds ? `<p><strong>运行时长:</strong> ${formatUptime(server.uptime_seconds)}</p>` : '';
+
             return `
                 <div class="server-card">
                     <div class="server-header">
@@ -516,6 +518,7 @@ function renderServerDetail(result) {
                         <p><strong>地址:</strong> ${server.host}</p>
                         <p><strong>版本:</strong> ${server.version} (Build ${server.build})</p>
                         <p><strong>虚拟机:</strong> ${server.vm_count} 台</p>
+                        ${uptimeInfo}
                         ${remarkDisplay}
                     </div>
                     <div class="server-stats">
@@ -1659,7 +1662,6 @@ async function confirmAddCredential() {
     if (result.success) {
         showToast('服务器已添加', 'success');
         closeAddCredentialModal();
-        servers.push({ name, host, username, password });
         renderCredentialsList();
         checkConnection();
         loadServerDetail(true);
