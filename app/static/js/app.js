@@ -2059,10 +2059,9 @@ async function runTaskNow(taskId) {
         showToast('正在执行...', 'info');
         const result = await apiRequest(`/scheduler/tasks/${taskId}/run`, { method: 'POST' });
         if (result.success) {
-            const r = result.result;
-            showToast(`完成: 成${r.success} 败${r.failed}`, r.failed > 0 ? 'warning' : 'success');
+            showToast('任务已在后台执行', 'success');
         } else {
-            showToast('执行失败', 'error');
+            showToast('执行失败: ' + (result.error || '未知错误'), 'error');
         }
     } catch (e) {
         showToast('执行失败', 'error');

@@ -1157,13 +1157,25 @@ def api_sync_holidays():
 @main_bp.route('/api/scheduler/tasks/<task_id>/run', methods=['POST'])
 def api_run_task(task_id):
     from .scheduler import get_job
+    import threading
     try:
         task = get_job(task_id)
         if not task:
             return jsonify({'success': False, 'error': 'Task not found'})
-        from .scheduler import execute_task
-        result = execute_task(task)
-        return jsonify({'success': True, 'result': result})
+        
+        def run_in_background():
+            from .scheduler import execute_task
+            try:
+                execute_task(task)
+            except Exception as e:
+                import logging
+                logging.error(f"Background task execution failed: {e}")
+        
+        thread = threading.Thread(target=run_in_background)
+        thread.daemon = True
+        thread.start()
+        
+        return jsonify({'success': True, 'message': 'Task started in background'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
