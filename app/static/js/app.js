@@ -269,18 +269,13 @@ function resetSettingsToDefaults() {
 }
 
 async function apiRequest(endpoint, options = {}) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
-
     try {
         const response = await fetch(API_BASE + endpoint, {
             headers: {
                 'Content-Type': 'application/json',
             },
-            signal: controller.signal,
             ...options
         });
-        clearTimeout(timeoutId);
 
         if (!response.ok) {
             const text = await response.text().catch(() => 'Request failed');
@@ -308,10 +303,6 @@ async function apiRequest(endpoint, options = {}) {
         }
         return { success: false, error: text };
     } catch (error) {
-        clearTimeout(timeoutId);
-        if (error.name === 'AbortError') {
-            return { success: false, error: '请求超时，请检查网络连接' };
-        }
         return { success: false, error: error.message };
     }
 }
@@ -2515,6 +2506,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     checkConnection();
     loadServerDetail();
+    loadVMs();
 
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.ready.then((registration) => {

@@ -55,11 +55,11 @@ def get_client_ip(request):
 
 def is_ip_allowed(request, config):
     client_ip = get_client_ip(request)
+    allowed_ips = config.get('allowed_ips', [])
 
-    if is_private_ip(client_ip):
+    if not allowed_ips:
         return True, client_ip
 
-    allowed_ips = config.get('allowed_ips', [])
     for network in allowed_ips:
         if network and network.strip():
             if ip_in_subnet(client_ip, network.strip()):
