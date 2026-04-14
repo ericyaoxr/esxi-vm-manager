@@ -58,6 +58,7 @@ class ConnectionPool:
                 context.check_hostname = False
                 context.verify_mode = ssl.CERT_NONE
                 password = decrypt_password(creds.get('password', ''))
+                write_log(f"Connecting to VSphere: {creds.get('host')}")
                 service_instance = connect.SmartConnect(
                     host=creds['host'],
                     user=creds['username'],
@@ -66,9 +67,11 @@ class ConnectionPool:
                 )
                 if self._is_connection_alive(service_instance):
                     self._connections[host] = (service_instance, time.time())
+                    write_log(f"VSphere连接成功: {creds.get('host')}")
                     return service_instance, None
                 return None, "Connection failed"
             except Exception as e:
+                write_log(f"VSphere连接异常: {creds.get('host')} - {str(e)}", "ERROR")
                 return None, str(e)
 
     def close_all(self):
@@ -245,6 +248,7 @@ def calculate_uptime_seconds(host_system):
 def get_all_vms_from_vsphere(server=None):
     service_instance, error = connect_to_vsphere(server)
     if error:
+        write_log(f"VSphere连接失败: {error}", "ERROR")
         return [], error
 
     vms = []
@@ -460,17 +464,29 @@ def api_list_vms():
         return jsonify({'success': True, 'vms': [], 'errors': None})
 
     def fetch_vms(server):
-        vms, error = get_all_vms_from_vsphere(server)
-        return server, vms, error
+        try:
+            vms, error = get_all_vms_from_vsphere(server)
+            return server, vms, error
+        except Exception as e:
+            return server, [], f"异常: {str(e)}"
 
     with ThreadPoolExecutor(max_workers=min(len(servers), 5)) as executor:
         futures = {executor.submit(fetch_vms, server): server for server in servers}
         for future in as_completed(futures):
-            server, vms, error = future.result()
-            if error:
-                errors.append(f"{server.get('name', server.get('host'))}: {error}")
-            else:
-                all_vms.extend(vms)
+            try:
+                server, vms, error = future.result(timeout=30)
+                if error:
+                    errors.append(f"{server.get('name', server.get('host'))}: {error}")
+                else:
+                    all_vms.extend(vms)
+            except TimeoutError:
+                server = futures[future]
+                errors.append(f"{server.get('name', server.get('host'))}: 连接超时")
+            except Exception as e:
+                server = futures[future]
+                errors.append(f"{server.get('name', server.get('host'))}: {str(e)}")
+
+    write_log(f"API /vms: loaded {len(all_vms)} VMs, errors: {len(errors)}")
 
     if not all_vms:
         return jsonify({'success': False, 'error': '; '.join(errors) if errors else 'No VMs loaded', 'vms': []})
