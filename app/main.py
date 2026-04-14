@@ -4,6 +4,7 @@ import os
 import json
 import ssl
 import time
+import threading
 from datetime import datetime, timedelta
 from flask import Blueprint, render_template, jsonify, request
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -12,6 +13,65 @@ from pyVim import connect
 from pyVmomi import vim
 
 main_bp = Blueprint('main', __name__)
+
+class ConnectionPool:
+    _instance = None
+    _lock = threading.Lock()
+
+    def __new__(cls):
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    cls._instance._connections = {}
+                    cls._instance._lock = threading.Lock()
+        return cls._instance
+
+    def get_connection(self, server):
+        host = server.get('host', '')
+        with self._lock:
+            if host in self._connections:
+                si, timestamp = self._connections[host]
+                try:
+                    if si and hasattr(si, 'content') and si.content:
+                        if time.time() - timestamp < 300:
+                            self._connections[host] = (si, time.time())
+                            return si, None
+                except:
+                    pass
+                try:
+                    connect.Disconnect(si)
+                except:
+                    pass
+                del self._connections[host]
+
+            creds = server
+            try:
+                context = ssl.create_default_context()
+                context.check_hostname = False
+                context.verify_mode = ssl.CERT_NONE
+                password = decrypt_password(creds.get('password', ''))
+                service_instance = connect.SmartConnect(
+                    host=creds['host'],
+                    user=creds['username'],
+                    pwd=password,
+                    sslContext=context
+                )
+                self._connections[host] = (service_instance, time.time())
+                return service_instance, None
+            except Exception as e:
+                return None, str(e)
+
+    def close_all(self):
+        with self._lock:
+            for host, (si, _) in self._connections.items():
+                try:
+                    connect.Disconnect(si)
+                except:
+                    pass
+            self._connections.clear()
+
+_pool = ConnectionPool()
 
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'esxi-vm-manager-secret-key'
@@ -117,18 +177,7 @@ def connect_to_vsphere(server=None):
     if not creds or not creds.get('host'):
         return None, "No credentials configured"
 
-    try:
-        context = get_ssl_context()
-        password = decrypt_password(creds.get('password', ''))
-        service_instance = connect.SmartConnect(
-            host=creds['host'],
-            user=creds['username'],
-            pwd=password,
-            sslContext=context
-        )
-        return service_instance, None
-    except Exception as e:
-        return None, str(e)
+    return _pool.get_connection(creds)
 
 def get_vm_state_from_vm(vm_obj):
     state_map = {
@@ -179,7 +228,6 @@ def get_all_vms_from_vsphere(server=None):
                 'uptime_seconds': getattr(vm.runtime, 'uptimeSeconds', 0)
             })
 
-        connect.Disconnect(service_instance)
     except Exception as e:
         return [], str(e)
 
@@ -204,7 +252,6 @@ def vm_action_by_name(vm_name, action, server=None):
                 break
 
         if not vm_obj:
-            connect.Disconnect(service_instance)
             return False, f"VM {vm_name} not found"
 
         if action == 'start':
@@ -230,14 +277,9 @@ def vm_action_by_name(vm_name, action, server=None):
         else:
             result = False
 
-        connect.Disconnect(service_instance)
         return result, None
 
     except Exception as e:
-        try:
-            connect.Disconnect(service_instance)
-        except:
-            pass
         return False, str(e)
 
 def wait_for_task(task, timeout=60):
@@ -339,7 +381,6 @@ def api_check_server():
 
     try:
         about = service_instance.content.about
-        connect.Disconnect(service_instance)
         return jsonify({
             'success': True,
             'info': {
@@ -493,7 +534,6 @@ def api_status():
                 'version': about.version,
                 'build': about.build
             })
-            connect.Disconnect(service_instance)
         except Exception as e:
             errors.append({'server': server.get('name', server.get('host')), 'error': str(e)})
 
@@ -626,7 +666,6 @@ def get_server_detail(server):
             'vm_count': len(content.viewManager.CreateContainerView(content.rootFolder, [vim.VirtualMachine], True).view)
         }
 
-        connect.Disconnect(service_instance)
         return result
     except Exception as e:
         return {
@@ -675,7 +714,6 @@ def api_vm_detail(vm_name):
                 break
 
         if not vm_obj:
-            connect.Disconnect(service_instance)
             return jsonify({'success': False, 'error': f'VM {vm_name} not found'})
 
         vm_summary = vm_obj.summary
@@ -774,14 +812,9 @@ def api_vm_detail(vm_name):
             'is_template': getattr(vm_runtime, 'template', False)
         }
 
-        connect.Disconnect(service_instance)
         return jsonify({'success': True, 'vm': vm_detail})
 
     except Exception as e:
-        try:
-            connect.Disconnect(service_instance)
-        except:
-            pass
         return jsonify({'success': False, 'error': str(e)})
 
 @main_bp.route('/api/vm/<vm_name>/performance', methods=['GET'])
@@ -811,7 +844,6 @@ def api_vm_performance(vm_name):
                 break
 
         if not vm_obj:
-            connect.Disconnect(service_instance)
             return jsonify({'success': False, 'error': f'VM {vm_name} not found'})
 
         perf_manager = content.perfManager
@@ -900,7 +932,6 @@ def api_vm_performance(vm_name):
         except Exception as e:
             write_log(f"Quick stats error: {str(e)}", "WARNING")
 
-        connect.Disconnect(service_instance)
         return jsonify({
             'success': True,
             'vm_name': vm_name,
@@ -909,10 +940,6 @@ def api_vm_performance(vm_name):
         })
 
     except Exception as e:
-        try:
-            connect.Disconnect(service_instance)
-        except:
-            pass
         return jsonify({'success': False, 'error': str(e)})
 
 @main_bp.route('/api/settings', methods=['GET'])
