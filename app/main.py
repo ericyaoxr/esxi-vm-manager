@@ -152,7 +152,8 @@ def get_all_vms_from_vsphere(server=None):
                 'server': server_name,
                 'server_host': server.get('host', '') if server else '',
                 'cpu': vm_summary.config.numCpu,
-                'memory': int(vm_summary.config.memorySizeMB / 1024)
+                'memory': int(vm_summary.config.memorySizeMB / 1024),
+                'uptime_seconds': getattr(vm.runtime, 'uptimeSeconds', 0)
             })
 
         connect.Disconnect(service_instance)

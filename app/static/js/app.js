@@ -7,6 +7,27 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+function formatUptime(seconds) {
+    if (!seconds || seconds <= 0) return 'N/A';
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    if (days > 0) return `${days}天 ${hours}小时`;
+    if (hours > 0) return `${hours}小时 ${minutes}分钟`;
+    return `${minutes}分钟`;
+}
+
+function getBootTime(uptimeSeconds) {
+    if (!uptimeSeconds || uptimeSeconds <= 0) return 'N/A';
+    const bootTime = Date.now() - (uptimeSeconds * 1000);
+    const d = new Date(bootTime);
+    const month = d.getMonth() + 1;
+    const day = d.getDate();
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${month}/${day} ${hours}:${minutes}`;
+}
+
 let vmData = [];
 let servers = [];
 let selectedVMs = new Set();
@@ -684,6 +705,7 @@ async function loadVMs() {
 function createVMCard(vm) {
     const stateClass = vm.state ? vm.state.toLowerCase().replace(' ', '-') : 'unknown';
     const isPoweredOff = vm.state === 'poweredOff';
+    const isRunning = vm.state === 'poweredOn';
     const canSuspend = vm.state === 'poweredOn';
     const canStart = vm.state === 'poweredOff' || vm.state === 'suspended';
     const key = vm.name + '|' + vm.server_host;
@@ -696,6 +718,8 @@ function createVMCard(vm) {
     const safeName = escapeHtml(vm.name);
     const safeServer = escapeHtml(vm.server || vm.server_host);
     const safeServerHost = escapeHtml(vm.server_host);
+    const uptimeDisplay = isRunning && vm.uptime_seconds ? `<p>运行时长: ${formatUptime(vm.uptime_seconds)}</p>` : '';
+    const bootTimeDisplay = isRunning && vm.uptime_seconds ? `<p>启动时间: ${getBootTime(vm.uptime_seconds)}</p>` : '';
 
     return `
         <div class="vm-card ${isSelected ? 'selected' : ''} ${isPoweredOff ? 'vm-powered-off' : ''}" data-vm-name="${safeName}" data-server-host="${safeServerHost}" data-vm-state="${vm.state || ''}">
@@ -708,6 +732,8 @@ function createVMCard(vm) {
                 <p>服务器: ${safeServer}</p>
                 <p>状态: ${stateText}</p>
                 <p>CPU: ${vm.cpu || 0} 核 | 内存: ${vm.memory || 0} GB</p>
+                ${bootTimeDisplay}
+                ${uptimeDisplay}
             </div>
             <div class="vm-card-footer btn-group" data-vm-name="${safeName}" data-server-host="${safeServerHost}">
                 <button class="btn btn-info btn-sm" onclick="openVmDetail('${safeName}', '${safeServerHost}', event)">详情</button>
